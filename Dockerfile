@@ -10,6 +10,6 @@ RUN ./configure
 
 RUN make install
 
-EXPOSE 8000
+EXPOSE 2101
 
 CMD /usr/local/ntripcaster/bin/ntripcaster
