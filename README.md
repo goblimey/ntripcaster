@@ -424,7 +424,7 @@ The EXPOSE allows the rest of the system to access that port.
 The next directive WORKDIR sets the working directory when the docker image is run.
 
 Finally, RUN runs a command when the docker image is started.
-It's the caster.
+It runs the caster.
  
 You are currently in the directory ntripcaster/ntripcaster/conf.
 Move back to the top level directory of your project
@@ -476,7 +476,7 @@ Running the image will produce something like:
 	[28/Aug/2019:15:21:56] Server limits: 100 clients, 100 clients per source, 40 sources
 	[28/Aug/2019:15:21:56] Starting Calender Thread...
 	[28/Aug/2019:15:21:56] Bandwidth:0.000000KB/s Sources:0 Clients:0
-
+ 
 The "docker run" ties up your git bash window.
 Start another and use ssh to connect to your VPS as before.
 
@@ -500,13 +500,44 @@ That should produce something like this:
     STR;BUCU0;Bucharest;RTCM 2.0;1(1),3(60),16(60);0;GPS;EUREF;ROU;44.46;26.12;0;0;Ashtech Z-XII3;none;B;N;520;TU Bucharest
     ENDSOURCETABLE
 
+Now check that the caster is receiving connections over the Internet.
+Back on your local computer,
+type this into the address bar of your web browser:
+
+    http://your.domain.name:2101/
+
+where your.domain.name is the domain name that you are using.
+
+DO NOT type this into the Google search box.
+That won't work.
+Type it into the address bar at the top of the browser.
+
+You should see a page like this:
+
+```
+SOURCETABLE 200 OK
+Server: NTRIP NtripCaster 0.1.5/1.0
+Content-Type: text/plain
+Content-Length: 519
+
+CAS;www.euref-ip.net;2101;EUREF-IP;BKG;0;DEU;50.12;8.69;http://www.euref-ip.net/home
+CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home
+NET;EUREF;EUREF;B;N;http://www.epncb.oma.be/euref_IP;http://www.epncb.oma.be/euref_IP;http://igs.ifag.de/index_ntrip_reg.htm;none
+NET;IGS;BKG;B;N;http://igscb.jpl.nasa.gov/;none;http://igs.ifag.de/index_ntrip_reg.htm;none
+STR;BUCU0;Bucharest;RTCM 2.0;1(1),3(60),16(60);0;GPS;EUREF;ROU;44.46;26.12;0;0;Ashtech Z-XII3;none;B;N;520;TU Bucharest
+ENDSOURCETABLE
+``` 
+
 This is good.
-Firstly, it shows that your caster is running.
-Secondly, the sourcetable that's returned is a copy of the one in the conf directory,
+It shows that your caster is running.
+The sourcetable that's returned is a copy of the one in the conf directory,
 which gives you some confidence that everything is knitted together propery.
 
-In the server log in the first window,
-the request for the source table produces an exra line:
+If the first test works and the second one doesn't,
+then port 2101 is not open on your VPS.
+
+Your first git bash windows should still be displaying the server log.ch
+a request for the source table produces an exra line:
 
     Kicking unknown 1 [172.17.0.1] [Sourcetable transferred], connected for 0 seconds
 
@@ -518,15 +549,26 @@ That produces a list something like:
     
     CONTAINER ID  IMAGE        COMMAND                CREATED        STATUS       PORTS     NAMES
     a5666adfd5d5  68b1841290ef "/bin/sh -c /usr/loc…" 2 minutes ago  Up 2 minutes 2101/tcp  happy_bassi
-    
 
 So docker is running one image, the caster.  Its container ID is a5666adfd5d5.
 Stop that container like so:
 
     sudo docker stop a5666adfd5d5
 
-To avoid confusion:  start the server using docker run and specify the image ID;
-stop it using docker stop and specify the container ID.
+That stops the container.
+Any files in it are destroyed,
+The advantage of that is that you don't have to do any tidying yourself.
+The disadvantage is that if something goes wrong and the caster crashes,
+the container dies and
+all evidence vanishes with it.
+
+You can set up the docker image so that things like the server log file survive.
+Read the docker manual to find out how.
+
+To avoid confusion:  to start the server use docker run and specify the image ID.
+Once it's running, refer to it using its container ID, not its image ID.
+The container lasts as long as you are running the image.
+The image lasts until you delete it.
 
 Whenever you change anything in the project, you need to run the docker build again.
 That will produce a new image with a different ID.
@@ -543,6 +585,10 @@ The "&" at the end of the command runs it in the background,
 so you get another prompt and you can issue more commands.
 The caster will run until something goes wrong and it dies,
 or until it's shut down.
+
+If you run "docker ps" again,
+you will see that the container ID is different.
+Running a docker image creates a new container.
 
 If something goes wrong, we need to find out what happened
 by looking at the log.
