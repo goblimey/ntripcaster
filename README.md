@@ -1,4 +1,4 @@
-# BKG's Open Source NTRIP Caster running under Docker
+# BKG's Open Source NTRIP Caster Running Under Docker
 
 This repository contains the BKG NTRIP caster set up to run under docker.
 
@@ -258,11 +258,17 @@ For Ubuntu Linux, install docker like so:
 Fetch my caster project:
 
     git clone git://github.com/goblimey/ntripcaster.git
+    cd ntripcaster
+    ls
 
-That creates a directory called ntripcaster.
+    Dockerfile  LICENSE  README.md  ntripcaster
+
+That creates a directory called ntripcaster
+and moves into it.
 (You don't need any privilege to do that,
 so you don't need sudo.)
-It containing a file Dockerfile and another directory,
+The "ls" command lists the contents of the directory.
+It contains four files including Dockerfile and another directory,
 also called ntripcaster.
 
 In there is README.txt containing BKG's original installation instructions.
@@ -308,7 +314,7 @@ Before you build the caster.
 you need to copy that file
 and edit it to fit your environment:
 
-    cd conf
+    cd ntripcaster/conf
     cp ntripcaster.conf.dist.in ntripcaster.conf
 
 If you are not familiar with Linux,
