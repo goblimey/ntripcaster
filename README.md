@@ -336,6 +336,12 @@ rp_email casteradmin@ifag.de       # substitute your email address
 server_url http://caster.ifag.de   # substitute http://your.domain.name
 ```
 
+A few lines later:
+
+```
+encoder_password sesam01           # choose a more secure password
+```
+
 further down the file:
 
 ```
@@ -512,21 +518,7 @@ DO NOT type this into the Google search box.
 That won't work.
 Type it into the address bar at the top of the browser.
 
-You should see a page like this:
-
-```
-SOURCETABLE 200 OK
-Server: NTRIP NtripCaster 0.1.5/1.0
-Content-Type: text/plain
-Content-Length: 519
-
-CAS;www.euref-ip.net;2101;EUREF-IP;BKG;0;DEU;50.12;8.69;http://www.euref-ip.net/home
-CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home
-NET;EUREF;EUREF;B;N;http://www.epncb.oma.be/euref_IP;http://www.epncb.oma.be/euref_IP;http://igs.ifag.de/index_ntrip_reg.htm;none
-NET;IGS;BKG;B;N;http://igscb.jpl.nasa.gov/;none;http://igs.ifag.de/index_ntrip_reg.htm;none
-STR;BUCU0;Bucharest;RTCM 2.0;1(1),3(60),16(60);0;GPS;EUREF;ROU;44.46;26.12;0;0;Ashtech Z-XII3;none;B;N;520;TU Bucharest
-ENDSOURCETABLE
-``` 
+You should see the same result as the previous test.
 
 This is good.
 It shows that your caster is running.
@@ -536,8 +528,8 @@ which gives you some confidence that everything is knitted together propery.
 If the first test works and the second one doesn't,
 then port 2101 is not open on your VPS.
 
-Your first git bash windows should still be displaying the server log.ch
-a request for the source table produces an exra line:
+Your first git bash windows should still be displaying the server log.
+Each request for the source table produces an exra line:
 
     Kicking unknown 1 [172.17.0.1] [Sourcetable transferred], connected for 0 seconds
 
@@ -593,11 +585,11 @@ Running a docker image creates a new container.
 If something goes wrong, we need to find out what happened
 by looking at the log.
 
-The docker container is a complete separate UNIX environment
+The docker container is a complete separate Linux environment
 and if you know its container ID you can run commands in it:
 
     sudo docker ps
-    
+
     CONTAINER ID  IMAGE        COMMAND                CREATED         STATUS          PORTS      NAMES
     f473f0749fd0  ca624f5eea74 "/bin/sh -c /usr/loc…" 10 minutes ago  Up 10 minutes   8000/tcp   determined_curie
 
@@ -612,7 +604,7 @@ The ps command shows you what programs are running in the container:
     root         6     1  0 16:35 ?        00:00:00 ./ntripcaster
     root         9     0 22 16:50 pts/0    00:00:00 ps -aef
 
-The running programs include the ps that you are running to see this output!
+The running programs include the ps that you are running to see this output.
 
 Going back to the original installation instructions that I quoted earlier,
 they say that to run the caster you should change directory to
@@ -629,17 +621,17 @@ it's empty:
 
     docker exec -it f473f0749fd0 ls /usr/local/ntripcaster/logs
 
-produces nothing, because there's nothing in there.
+The ls command produces nothing, because there's nothing in there.
 The log is in the bin directory,
-because that's where we are when we start the caster:
+because that was the current directory when we started the caster:
 
     root@audolatry:/home/simon/ntripcaster# docker exec -it f473f0749fd0 ls /usr/local/ntripcaster/bin
     
     ntripcaster  ntripcaster.log
 
 You can track what's written to the log using the tail command.
-the -f option makes tail run forever,
-showing new lines as they arrive:
+The -f option makes tail run forever,
+displaying new lines as they arrive:
 
     docker exec -it 80d5bc1e5b57 tail -f /usr/local/ntripcaster/bin/ntripcaster.log
 
@@ -664,29 +656,41 @@ They should warn you if they do that,
 but you will have to start caster again
 using docker run.
 
-You can configure the VPS to run a command whenever it starts as described
-[here](https://raspberrypi.stackexchange.com/questions/75049/how-do-i-make-sh-run-on-boot-to-console/75057#75057)
-The important part of that page is the bit that starts
-"The easiest thing to do there would be to just add something to the end of /etc/rc.local (but before the final exit 0 line)".
-If you edit that file (using "sudo nano") and add your "docker run" command,
-the caster will be started automatically whenever your VPS starts up.
+You can configure the VPS to run a command whenever it starts.
+Unfortunately, how to do that depends on what version of Linux you are running on your VPS.
+(Not to be confused with the version that you specified in the Dockerfile.)
+
+I'm running Ubuntu on my VPS, and a Google search led me to https://askubuntu.com/questions/814/how-to-run-scripts-on-start-up.
+The relevent part is "The upstart system will execute all scripts from which it finds a configuration in directory /etc/init. These scripts will run during system startup (or in response to certain events, e.g., a shutdown request) and so are the place to run commands that do not interact with the user; all servers are started using this mechanism."
 
 ## Configuring Your Base Station and Rover
 Configuring your base station and your rover depends on what you are using.
 Read the manuals.
 You will need to supply the information
-that you set up in the configuration file -
+that you set up in the ntripserver.conf configuration file.
+Both will need
 the server URL, port (2101),
-mountpoint name,
-user name and password.
-When the rover connects,
+and mountpoint name.
+The base station should use the encoder password
+(and I'm guessing, any user name).
+The rover will need the user name and password for the mountpoint.
+
+When any of your devices connect to the caster,
 you should see some activity in the caster's log
 on your VPS.
 
 
 ## Tweaks to The Original Source Code From BKG
+The caster is free software
+originally written in C by BKG and distributed by them.
+I would have preferred to use that as my starting point,
+but when the time came,
+I couldn't find it.
+Instead I used a copy on github:
+https://github.com/nunojpg/ntripcaster.
+
 There are a huge number of ready-made projects out there
-that you can download, build and run.
+written in C and C++ that you can download, build and run.
 The procedure tends to be:
 
     ./configure
@@ -695,15 +699,7 @@ The procedure tends to be:
 If you can automate the whole process,
 including any configuration tweaks,
 you can use docker to build the project and run the result.
-This section may be useful if you want to do that..
-
-The caster is free software
-originally written by BKG and distributed by them.
-I would have preferred to use that as my starting point,
-but when the time came,
-I couldn't find it.
-Instead I used a copy on github:
-https://github.com/nunojpg/ntripcaster.
+This section may be useful if you want to do that.
 
 This caster implements NTRIP version 1.
 BKG went on to define NTRIP version 2.
@@ -728,7 +724,8 @@ becomes
 
 This sets up the Makefle so that when you run "make install",
 it copies four files from the conf directory rather than two.
-This allows you to set them up as you need before you build the project.
+This allows you to set up ntripcaster.conf and sourcetable.dat
+as you need before you build the project.
 
 Theoretically, Makefile.in is derived from Makefile.am
 when you run ./configure
@@ -760,8 +757,10 @@ it can do better by repeatedly finding its position and averaging the results.
 Dual-band GNSS Receivers are now available that can analyse
 two signals coming from the same satellite on different frequencies
 to get an even more acurate position.
-This receiver (the base station)
-can then send corrections to a nearby rover.
+
+A base station that knows its position accurately,
+it
+can send corrections to a nearby rover.
 
 Essentially the base station says "I know I'm here.
 The signal from satellite X says that I'm there,
@@ -770,26 +769,28 @@ It sends a stream of correction messages to the rover,
 which uses them to correct the position that it's receiving
 from the same satellite.
 
-If the rover is within about 10 Km of the base station
-and the base station knows its position perfectly,
-the rover can find its position within 2 cm.
-If the base station position is wrong by, say, 5 cm,
-then the results that the rover gets will be shifted by that much.
-
 Apart from using GNSS to find the base station's position,
 the operator can use traditional surveying techniques
 and then configure the base station accordingly.
 The more accurately the position is set,
 the more accurate the rover's position will be.
 
+If the rover is within about 10 Km of the base station
+and the base station knows its position perfectly,
+the rover can find its position within 2 cm.
+If the base station position is wrong by, say, 5 cm in one direction,
+then each corrected position that the rover produces will be shifted by
+5cm in the same direction.
+
 The Radio Technical Commission for Maritime Services (RTCM) produced a standard
 protocol for the corrections over a radio link.
 so a base station from one manufacturer can send corrections
 to a rover from another manufactuer.
 This is called the RTCM protocol.
+It's currenty at ersion 3.
 
 Radio connections can be a bit flaky
-and these days its much easier than it used to be to get Internet access.
+and these days it's much easier than it used to be to get Internet access.
 The Network Transport of Rtcm via Internet Protocol (NTRIP)
 replaces the radio link with a connection over the Internet
 using HTTP.
@@ -812,7 +813,7 @@ a caster, a server and a client.
 The caster broadcasts the data coming from one or more base stations.
 Each base station is represented in the caster by a mountpoint.
 All other components communicate via the caster,
-so only it needs a known address. 
+so only it needs a well-known address. 
 
 Each base station sends a series of HTTP requests to the caster,
 containing correction data in RTCM messages.
@@ -844,12 +845,12 @@ but their services are expensive
 For somebody like a sureveyor working in the Oil and Gas sector,
 this makes a lot of sense:
 wherever you are in the world,
-your device will receive some sort of correction data,
+your rover will receive some sort of correction data,
 making it more accurate than it would be otherwise.
 In places like Western Europe,
 it wlll be accurate to within a few centimetres.
 
-For a surveyor working for the local government,
+For a surveyor working for a small local government authority,
 or a field archaeologist,
 those services may be too expensive,
 and running their own base station is more feasible.
@@ -857,13 +858,13 @@ Even better,
 they might be able to use somebody else's base station
 and only need buy a $300 rover.
 
-There are free NTRIP services such as BKG's own network
+There are free NTRIP services such as the International GNSS Service (IGS).
 and rtk2go.com,
 provided by snip.com,
 a company that makes and sells commercial NTRIP software.
 The free services are very limited,
 with just a few base stations scattered over large distances.
-For example, my nearest BKG mountpoint is at Herstmonceaux.
+For example, my nearest IGS mountpoint is at Herstmonceaux.
 If I lived in Brighton or Eastbourne,
 that would be great,
 but I don't.
@@ -874,8 +875,9 @@ but running my own base station is better.
 The rtk2go.com NTRIP service allows you to connect your own base station and share its corrections with other people.
 Unfortunately,
 a lot of the base station owners (in the UK at least) seem to switch them off when they are not using them.
+All the ones near me are only on occasionally.
 Also, the service is only free now while it's in beta test.
-The providers (snip.com) say that they plan to charge for it eventually.
+The owners say that they plan to charge for it eventually.
 
 ## NTRIP on a Budget
 In the past,
