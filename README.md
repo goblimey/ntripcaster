@@ -271,7 +271,9 @@ The "ls" command lists the contents of the directory.
 It contains four files including Dockerfile and another directory,
 also called ntripcaster.
 
-In there is README.txt containing BKG's original installation instructions.
+That subdirectory contains the materal to build the caster,
+including a file
+README.txt containing BKG's original installation instructions.
 This is an extract,
 which describes the steps that the docker build process has to mimic:
 
