@@ -3,30 +3,283 @@
 This repository contains the BKG NTRIP caster set up to run under docker.
 
 Docker provides a ready-made predictable environment in which you can build and run software.
-The steps to buid and run a docker application are the same regardless of your operating system.
+The steps to build and run a docker application are the same regardless of your operating system.
 
-This document explains how to create a server that can run the caster,
-how to build and run the caster and how to manage it.
-It also explains what an NTRIP caster is.
+Until docker came along,
+installing software like this on a computer was a nightmarish mess,
+because the environment provided by every computer was
+different and unpredictable - Windows 7, Windows 10, Ubuntu Linux, Red hat Linux
+or whatever,
+and usually with different optional software installed.
 
-As explained below,
+When docker runs, it creates a stripped-down
+Linux environment on your computer
+within whichever operating system it's actually running
+it uses that to build an image,
+which then runs in a similar Linux environment.
+This irons out a huge number of annoying environmental issues.
+
+The fact that each piece of docker software is encapsulated in its own environment
+also reduces problems caused by hidden interactions.
+Two parts can only communicate through well understood interfaces.
+
+This does mean that to put a solution together you may have to learn a few new skills,
+which is a cost,
+but most people find that the benefits of using docker far outweigh the costs.
+
+This document explains how to set up a suitable environment
+for your caster,
+how to build and run it and how to manage it once it's running.
+
+At the end of this document,
+I also explain what an NTRIP caster is.
+That may seem like a strange order,
+but NTRIP is fairly specialist and if you are reading this at all,
+you probably understand at least something about NTRIP.
+
+I should also say at the beginning that
 you don't necessarily need your own NTRIP caster.
-There are a number already available that you could use.
-If you do need to run your own,
+There are a number already available that you might use instead.
+
+If you do need to run your own caster,
 read on.
 
-## Domain and Server
-To run the caster, you need a server on the Internet with a well-known IP address.
-That means you need to own an Internet domain.
-You can obtain one from various domain registrars such as
-[namecheap](https://www.namecheap.com/)
-or [ionos](https://www.ionos.co.uk/domains/domain-names?ac=OM.UK.UKo42K356180T7073a&gclid=CjwKCAjwzJjrBRBvEiwA867byhd5ynLOIbN-A4a2-9cpfmQS4pAvJj4gE6oRjs_5HSW2STzu9oYgiBoCUFUQAvD_BwE&gclsrc=aw.ds).
+## Configuration Files
 
-You don't actually buy a domain.
+BKG's original build and installation instructions are
+[here](https://github.com/goblimey/ntripcaster/blob/master/ntripcaster/README.txt)
+They include some manual steps,
+to be followed once the software is built:
+
+"Go to the configuration directory and rename "sourcetable.dat.dist" and
+"ntripcaster.conf.dist" to "sourcetable.dat" and "ntripcaster.conf".
+Edit both files according to your needs. For details about "sourcetable.dat"
+see file "NtripSourcetable.doc". In the configuration file "ntripcaster.conf"
+you have to specify the name of the machine the server is running on
+(no IP adress!!) and you can adapt other settings, like the listening ports,
+the server limits and the access control."
+
+The file NtripSourcetable.doc is
+[here](https://github.com/goblimey/ntripcaster/blob/master/ntripcaster/conf/NtripSourcetable.doc).
+It may make more sense if you look at the example configuration files while you are reading it.
+
+That comment about "no IP address" means that the caster has to run on a server with a well-known name.
+If you have your own network of Windows machines
+and you know how to configure them,
+you may be able to get the caster working on one of those.
+Here I assume that you are going to set it up on a server on the Internet with a proper domain name.
+Nowadays, that's fairly cheap,
+and it's one less machine to manage.
+
+BKG's instructions go on to say:
+
+"Whatever the content of your "sourcetable.dat" finally might be, it is recommended
+to include the following line in that configuration file:
+CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home".
+
+That line is already in the example source table file.
+
+In this version of the caster
+the manual configuration steps are replaced by an automatic docker build process.
+You just need to set up
+two configuration files called sourcetable.dat and ntripcaster.conf
+before you run it.
+
+sourcetable.dat defines your mountpoints.
+Each mountpoint defines a name for an NTRIP base station.
+I have one base station.
+It's on the roof of my shed
+in Leatherhead in the UK.
+I call my mountpoint "uk_leatherhead".
+
+My sourcetable.dat looks like this:
+
+```
+CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home
+STR;uk_leatherhead;Leatherhead;RTCM 3.0;;;;;GBR;51.29;-0.32;1;0;sNTRIP;none;N;N;0;;
+```
+
+Field 2 "uk_leatherhead" is the name of my mountpoint.
+
+Field 3 "Leatherhead" is the nearest town to my base station.
+
+GBR is the three-letter code for the UK.
+You can find the two and three letter code for your country
+[here](https://www.iban.com/country-codes).
+
+"51.29;-0.32" gives the longitude and latitude of my base station.
+If you don't know that,
+you can use "0.00;0.00".
+
+The file ntripcaster.conf defines all sorts of other things,
+including the user names and password used to access the mountpoints.
+All base stations use the same password.
+There's no facility to specify a user name,
+so your base station can use any user name.
+The rovers use different user names and passwords according to which mountpoint they connect to.
+
+The lines you need to change are scattered through the file:
+
+```
+rp_email casteradmin@ifag.de       # substitute your email address
+server_url http://caster.ifag.de   # substitute http://your.domain.name
+```
+
+```
+encoder_password sesam01           # Password for base stations.  Choose something more secure.
+```
+
+```
+server_name igs.ifag.de             # substitute your.domain.name
+
+```
+  
+The last two lines of the file specify the user names and passwords
+that rovers must use to access the mountpoints:
+
+```
+/BUCU0:user1:password1,user2:password2
+/PADO0
+```
+
+In this file, the mountpoint names must start with "/"
+(but not in sourcetable.dat).
+
+That second mountpoint has no username or password
+so it's public -
+any rover can connect to it.
+
+In the example the names are in upper case.
+They don't have to be
+but whatever you choose,
+you must use the same case when configuring your rover -
+bucu0, Bucu0 and BUCU0 are all different names.
+
+## Quick Instructions
+These instructions are for those readers
+who are familiar with concepts such as docker,
+remote management of computers,
+domain names, virtual private servers and so on.
+If you are not one of those people,
+continue to the next section.
+
+Run these commands on your server:
+
+    git clone git://github.com/goblimey/ntripcaster.git
+    cd ntripcaster/ntripcaster/conf
+    cp ntripcaster.conf.dist.in ntripcaster.conf
+
+Edit your configuration files as explained above.
+
+Then build your docker image:
+
+    cd ../..
+    sudo docker build .
+
+Run it like so:
+
+    sudo docker run -p2101:2101 {image_id} >/dev/null 2>&1 &
+
+The caster runs on port 2101.
+The -p option publishes that port and makes it available to the outside world
+on the same port of the VPS.
+
+">/dev/null" connects the docker command's standard output channel to a special file that just discards anything
+written to it.
+"2>&1" connects the standard error channel to whatever the standard output channel is connected to.
+That means that the docker image will run quietly,
+without sending anything to the console.
+The "&" at the end of the command runs it in the background,
+so you get another prompt and you can issue more commands.
+The caster will survive you ending the ssh session
+that you used to start it.
+It will run until something goes wrong and it dies,
+or until it's forcibly shut down.
+
+For a quick check that it's working,
+use curl to fetch the home page.
+It should produce a copy of the source table:
+
+    curl http://localhost:2101/
+
+(That's http, NOT https.)
+
+This also tests that the caster can access its configuration files.
+
+If that works,
+and you have curl installed on your local computer,
+try the same test across the network:
+
+    curl http://my.domain.name:2101/
+
+If the first test worked and this one doesn't,
+the most likely explanation is that you haven't arranged with your VPS provider
+to open up port 2101 to tcp traffic.
+
+(You could try the same test with a web browser,
+but modern versions of chrome have gone all https
+and it doesn't seem to like http requests anymore.)
+
+The caster writes a log file which you can use to debug problems.
+BKG's original installation instructions say
+that to run the caster you should change directory to
+/usr/local/ntripcaster/bin
+and run the program from there.
+It will then pick up the configuration files from
+/usr/local/ntripcaster/conf and write a log file
+in /usr/local/ntripcaster/logs.
+
+Not quite.
+We saw earlier that it's picking up the configuration,
+but if we look in the logs directory,
+it's empty:
+
+    docker exec -it {image_id} ls /usr/local/ntripcaster/logs
+
+The ls command produces nothing, because there's nothing in there.
+The log is actually in the bin directory,
+because that was the current directory when we started the caster:
+
+    docker exec -it {image_id} ls /usr/local/ntripcaster/bin
+    
+    ntripcaster  ntripcaster.log
+
+You can track what's written to the log using the tail command.
+The -f option makes tail run forever,
+displaying new lines as they arrive:
+
+    docker exec -it {image_id} tail -f /usr/local/ntripcaster/bin/ntripcaster.log
+
+    [29/Aug/2019:16:55:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:16:56:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:16:57:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:16:58:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:16:59:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:17:00:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:17:01:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:17:02:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:17:03:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+    [29/Aug/2019:17:04:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
+
+If you connect a base station, the source value will increase by one.
+If you connect a rover, the client value will increase by one.
+
+Use ctrl/c to stop the tail command.
+    
+
+## The Domain and the Server
+To run the caster, you need a server with a well-known name.
+You can achieve that by buying an Internet domain.
+Strictly you don't buy a domain.
 You rent it from a domain registrar,
 so you have to pay regularly to keep it going.
-I mention those two registrars
-because the initial registration and the subsequent
+
+You can obtain a domain from various domain registrars such as
+[namecheap](https://www.namecheap.com/)
+or [ionos](https://www.ionos.co.uk/domains/domain-names?ac=OM.UK.UKo42K356180T7073a&gclid=CjwKCAjwzJjrBRBvEiwA867byhd5ynLOIbN-A4a2-9cpfmQS4pAvJj4gE6oRjs_5HSW2STzu9oYgiBoCUFUQAvD_BwE&gclsrc=aw.ds).
+There are many others.
+I mention those two
+because their initial registration fees and their subsequent
 renewal fees are both reasonable.
 When choosing a registrar,
 always check the renewal fees.
@@ -44,8 +297,7 @@ but they can be expensive.
 offer a VPS called a droplet that you can rent for $5 per month.
 In the UK,
 [Mythic Beasts](https://www.mythic-beasts.com/servers/virtual) offer a configurable VPS,
-so you can choose how much processor power it has.
-
+so you can choose how much processor power it has and how much it costs.
 The more powerful your VPS,
 the more you pay,
 but you don't need much computer power to run an NTRIP caster.
@@ -71,20 +323,22 @@ Your VPS supplier's tech support people should be able to explain how to do it.
 (That's another reason for using one of the better-known domain registrars such as ionos or namecheap.
 The techies at the VPS company should know what to do.)
 
-Each service on a server runs on a numbered port.
-The caster runs on port 2101.
+Each network service on a computer runs on a numbered port,
+for example, a web server will usually run its http service on port 80
+and its https service on port 443. 
+The NTRIP caster runs on port 2101.
 For security reasons
 many VPS suppliers
 stop access to ports by default.
-You have to open the port for tcp access.
+You have to ensure that port 2101 is open for tcp access.
 You may need to ask the tech support people how to do this. 
 
-## Installing the Caster
+## Connecting to Your VPS
 Once your VPS is set up and
 responding to your domain name,
 you need to connect to it
 from whatever computer you normally use.
-The rest of these instructions assume that 
+These instructions assume that 
 you are running MS Windows on your local machine
 (because most people do)
 and that your VPS is running
@@ -95,27 +349,40 @@ You need to
 consult your VPS supplier about that.
 The docker commands will be the same.
 
+Assuming that you have an ssh tool installed,
+connect to your VPS:
+
+    ssh user@my.domain.name
+
+If you don't know anything about ssh,
+I explain more in a later section.
+
 There are various ways to connect to a VPS.
 The ssh command is probably the most common.
-If your local machine
-runs Microsoft Widows
-you need to install some software to get an ssh command.
-You don't have that out of the box.
-You can get one by installing [git for windows](https://gitforwindows.org/).
+Your Windows machine can't do that out of the box,
+you need to install some software.
+My suggestion is
+[git for windows](https://gitforwindows.org/).
 Once you've installed that,
-run Git Bash,
-which starts a command window.
-You can run ssh in that.
+go to your start menu and run Git Bash.
+That starts a command window and you can run ssh in that.
 
 To connect to your VPS you need a user name and password.
 You also need your domain name.
 
+
+
+If your user name is "user" and your domain is "my.domain.name",
+connect to your VPS like so:
+
+    ssh user@my.domain.name
+
 When you set up your VPS you may have been asked
 to create a public/private key pair.
 They are files in the .ssh directory in your home directory on your local machine.
-If the computer you are connecting from has
-your private key file and the computer you are connecting to
-has your public key file,
+If the machine you are connecting from has
+your private key installed and the machine you are connecting to
+has your public key installed,
 you don't need a password.
 
 If you didn't create a key pair,
@@ -127,27 +394,21 @@ your VPS should be set up so that
 it's only possible to connect from a computer that holds a copy of the private key.
 That's less convenient but much more secure.
 
-If your user name is "user" and your domain is "my.domain.name",
-connect to your VPS like so:
-
-    ssh user@my.domain.name
-
-(Now would be a very good time to make a backup copy of your key pair
+(So now would be a very good time to make a backup copy of your key pair
 on a memory stick.)
 
-Once you have connected from your git bash window to your VPS,
-you are running commands 
-in that window on the VPS,
-NOT on your local machine.
-Type ctrl/d or the exit command to end the session
-and get back to your local machine.
+Logging in withb a key pair is not just convenient,
+it's much more secure.
+Your VPS supplier should have arranged that
+it's not possible to log in over the network using a password.
 
-To reinforce my point about other people logging in,
-once you are connected, type this command:
+To see why, once you are connected to your VPS, try this:
 
     tail -100 /var/log/auth.log
     
-This is what I got when I did this:
+It shows the recent log of attempted logins.
+If you haven't tried this before, the result is quite scary.
+This is what I got:
 
 ```
 Aug 29 09:31:31 audolatry sshd[24565]: Received disconnect from 122.195.200.148 port 14902:11:  [preauth]
@@ -199,7 +460,8 @@ Aug 29 10:22:29 audolatry sshd[28412]: Connection reset by 49.88.112.85 port 138
 
 The line that says "Accepted publickey for root" is me connecting using my key.
 The rest show other
-people all round the world trying to connect by guessing user names and passwords.
+people all round the world trying to connect to my VPS
+by guessing user names and passwords.
 Ths will have started as soon as my domain was created
 and announced.
 One tried connecting as the user root, another tried as the user rabbtmq,
@@ -210,25 +472,25 @@ tries to connect,
 guesses another password,
 tries to connect
 and so on.
-It goes on all day and all night as long as your VPS is running.
-It probably costs the attackers nothing to do this
-because they are stealing time on somebody else's computer to do it.
+You can see which IP address they are coming in from,
+but they are probably using somebody else's computer that they've already compromised.
 
 If you allow connection by user name and password,
-somebody will eventually make a correct guess and get in.
+it's just a question of time before
+somebody makes a correct guess and gets in.
 That would be bad.
-Prevent this by configuring your VPS to only allow lgins over the network
-using keys.
+They can use your VPS for all sorts of nefarious purposes,
+for which you could be blamed.
+
+Prevent this by configuring your VPS to refuse logins over the network
+using a password.
 Consult your VPS supplier about how to do that.
 Keep a safe copy of your keys,
 otherwise you could lock yourself out as well as the hackers.
 
-Security sermon over.  Now let's build an NTRIP caster.
+That's the security sermon over.  Now let's build an NTRIP caster.
 
-First, install docker on your VPS.
-How you do that depends on which operating system you are running.
-
-Another small complication.
+## Installing the Caster
 There's a user called root that has special privileges.
 You need them to install things.
 Your VPS supplier may set things up so that you log in
@@ -243,24 +505,32 @@ because it automates all of the dangerous operations.
 You can also add the sudo if you are root.
 It only wastes time,
 it doesn't do any harm.
-I'm going to use sudo for all commands that need the privilege,
+I'm going to add sudo to all commands that need it,
 and you can just copy and paste them into your git bash window.
 
 (Concerning pasting,
 you can't use the usual Windows shortcut ctrl/v to paste into the ssh window.
 Right click and a small menu appears with a paste option.)
 
+First, install docker on your VPS.
+How you do that depends on which version of Linux you are running
+on your VPS.
+For Ubuntu, it's:
 
-For Ubuntu Linux, install docker like so:
+    sudo apt install docker.io
+    
+The Docker service needs to be set up to run when your VPS machne starts up:
 
-    sudo apt-get install docker.io
+    sudo systemctl start docker
+    
+    sudo systemctl enable docker
 
-Fetch my caster project:
+Next fetch my caster project:
 
     git clone git://github.com/goblimey/ntripcaster.git
     cd ntripcaster
     ls
-
+    
     Dockerfile  LICENSE  README.md  ntripcaster
 
 That creates a directory called ntripcaster
@@ -270,109 +540,24 @@ so you don't need sudo.)
 The "ls" command lists the contents of the directory.
 It contains four files including Dockerfile and another directory,
 also called ntripcaster.
-
-That subdirectory contains the materal to build the caster,
-including a file
-README.txt containing BKG's original installation instructions.
-This is an extract,
-which describes the steps that the docker build process has to mimic:
-
-```
-To install the NtripCaster do the following:
-- unzip the software in a separate directory
-- run "./configure" (if you do not want the server to be installed in
-"/usr/local/ntripcaster" specify the desired path with "./configure --prefix=<path>")
-- run "make"
-- run "make install"
-
-After that, the server files will be in "/usr/local/ntripcaster", binaries will
-be in "/usr/local/ntripcaster/bin", configuration files in
-"/usr/local/ntripcaster/conf", logs in "/usr/local/ntripcaster/logs" and
-templates in "/usr/local/ntripcaster/templates" (or in your desired path
-correspondingly).
-
-Go to the configuration directory and rename "sourcetable.dat.dist" and
-"ntripcaster.conf.dist" to "sourcetable.dat" and "ntripcaster.conf".
-Edit both files according to your needs. For details about "sourcetable.dat"
-see file "NtripSourcetable.doc". In the configuration file "ntripcaster.conf"
-you have to specify the name of the machine the server is running on
-(no IP adress!!) and you can adapt other settings, like the listening ports,
-the server limits and the access control.
-```
-
-Those instructions include some tweaks that
-you have to do manually after you've built
-and installed the caster.
-That's not easy to do
-with docker,
-so I've made some changes to the setup files
-to do it automatically.
-
-Within the directory ntripcaster there is
-a directory called conf.
-It contains a file
-ntripcaster.conf.dist.in.
-Before you build the caster.
-you need to copy that file
-and edit it to fit your environment:
+Within that, there's a directory called conf.
+You need to create files in there
+as explained in the earlier section
+Configuration Files.
 
     cd ntripcaster/conf
+    cp sourcetable.dat.dist sourcetable.dat
     cp ntripcaster.conf.dist.in ntripcaster.conf
 
-If you are not familiar with Linux,
-use the editor nano.
+If you are not familiar with Linux, use the editor nano:
+
+    nano sourcetable.dat
+
 While you are in nano,
 move around the file using the arrow keys.
 The mouse doesn't work.
 When you have finished editing the file,
 use ctrl/o to write your changes and ctrl/x to exit.
-
-    nano ntripcaster.conf
-
-You need to change these lines:
-
-```
-rp_email casteradmin@ifag.de       # substitute your email address
-server_url http://caster.ifag.de   # substitute http://your.domain.name
-```
-
-A few lines later:
-
-```
-encoder_password sesam01           # choose a more secure password
-```
-
-further down the file:
-
-```
-server_name igs.ifag.de             # substitute your.domain.name
-
-```
-  
-The last two lines of the file are:
-
-```
-/BUCU0:user1:password1,user2:password2
-/PADO0
-```
-
-Those lines define your mountpoints and the user names and passwords that can access them.
-Create a mountpoint for your base station.
-The name must start with "/".
-In the example they are in upper case.
-They don't have to be
-but whatever you choose,
-you must remember to use the same case when configuring your rover -
-bucu0, Bucu0 and BUCU0 are all different names.
-
-The second mountpoint in the example has no username list,
-so it's public -
-anybody can connect their rover to it
-without a user name and password.
-It's much more secure to require rovers to log in.
-
-Those are all the changes you need to make to ntripcaster.conf.
-To get out of the nano editor, type ctrl/o to write the changes and ctrl/x to exit.
 
 Now you can build your caster.
 The Dockerfile in the top level directory of your project looks something like this:
@@ -397,13 +582,10 @@ WORKDIR /usr/local/ntripcaster/bin
 CMD ./ntripcaster
 ```
 
-When docker runs, it creates a Linux environment on your computer
-within whichever operating system it's actually running.
-it uses that to build an image,
-which will later be run in a similar Linux environment.
 The directives in the Dockerfile
-automate a process which is similar to the steps described by
-BKG's original installation instructions shown above,
+automate a build process which is similar to the steps described by
+BKG's original installation instructions shown above.
+
 
 FROM defines which version of Linux docker will run, in this case Ubuntu 18.4.
 Check the website for Linux distribution you are using
@@ -463,8 +645,6 @@ Run the image like so:
 
 The -p connects port 2101 of the docker image to port 2101 of the host machine,
 in this case, your VPS.
-As I said earlier, you need to check that network connections are allowed
-on this port.
  
 Running the image will produce something like:
 
@@ -490,54 +670,64 @@ An NTRIP server responds to http requests.
 Using the curl command you can send a request
 to the server for its home page and see the result:
 
-    $ curl localhost:2101/
+    $ curl http://localhost:2101/
     
 That should produce something like this:
 
     SOURCETABLE 200 OK
     Server: NTRIP NtripCaster 0.1.5/1.0
     Content-Type: text/plain
-    Content-Length: 519
+    Content-Length: 483
     
-    CAS;www.euref-ip.net;2101;EUREF-IP;BKG;0;DEU;50.12;8.69;http://www.euref-ip.net/home
     CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home
-    NET;EUREF;EUREF;B;N;http://www.epncb.oma.be/euref_IP;http://www.epncb.oma.be/euref_IP;http://igs.ifag.de/index_ntrip_reg.htm;none
-    NET;IGS;BKG;B;N;http://igscb.jpl.nasa.gov/;none;http://igs.ifag.de/index_ntrip_reg.htm;none
-    STR;BUCU0;Bucharest;RTCM 2.0;1(1),3(60),16(60);0;GPS;EUREF;ROU;44.46;26.12;0;0;Ashtech Z-XII3;none;B;N;520;TU Bucharest
+    STR;uk_leatherhead;Leatherhead;RTCM 3.0;;;;;GBR;51.29;-0.32;1;0;sNTRIP;none;N;N;0;;
     ENDSOURCETABLE
 
-Now check that the caster is receiving connections over the Internet.
-Back on your local computer,
-type this into the address bar of your web browser:
+which is the contents of your sourcetable.dat,
+preceded by some HTTP header lines.
 
-    http://your.domain.name:2101/
-
-where your.domain.name is the domain name that you are using.
-
-DO NOT type this into the Google search box.
-That won't work.
-Type it into the address bar at the top of the browser.
-
-You should see the same result as the previous test.
-
-This is good.
-It shows that your caster is running.
-The sourcetable that's returned is a copy of the one in the conf directory,
-which gives you some confidence that everything is knitted together propery.
-
-If the first test works and the second one doesn't,
-then port 2101 is not open on your VPS.
-
-Your first git bash windows should still be displaying the server log.
+Meanwhile,
+your first git bash windows should still be displaying the server log.
 Each request for the source table produces an exra line:
 
     Kicking unknown 1 [172.17.0.1] [Sourcetable transferred], connected for 0 seconds
+
+This is good.
+It shows that your caster is running
+and has found its conf directory
+and the files in it,
+so it's a sign that 
+everything is knitted together properly.
+
+If your Git Bash tool supports curl,
+you can try the same from your local machine,
+connecting over the Internet.
+Start another Git Bash
+window.
+Don't connect it to your VPS, just run this command,
+which will run locally and connect to your VPS across the Internet:
+
+    curl http://my.domain.name:2101/
+
+(substituting your domain name)
+
+It should produce the same result.
+if not,
+the obvious explanation is that
+port 2101 on your VPS
+is not open for tcp requests.
+
+You could try the same test by typing that request URL
+into the address bar of your web browser,
+but they are beginning to support https only,
+and this request is http, so it may not work.
 
 Now you can shut down the server.  First you must find the ID of the running image:
 
     sudo docker ps
 
-That produces a list something like:
+That produces a list of running docker containers,
+something like:
     
     CONTAINER ID  IMAGE        COMMAND                CREATED        STATUS       PORTS     NAMES
     a5666adfd5d5  68b1841290ef "/bin/sh -c /usr/loc…" 2 minutes ago  Up 2 minutes 2101/tcp  happy_bassi
@@ -547,8 +737,14 @@ Stop that container like so:
 
     sudo docker stop a5666adfd5d5
 
-That stops the container.
-Any files in it are destroyed,
+To avoid confusion:  to start the server use docker run and specify the image ID.
+Once it's running, refer to it using its container ID, not its image ID.
+The container lasts as long as you are running the image.
+The image lasts until you delete it.
+
+When the container stops,
+the Linux image that was running
+and any files in it are destroyed,
 The advantage of that is that you don't have to do any tidying yourself.
 The disadvantage is that if something goes wrong and the caster crashes,
 the container dies and
@@ -557,17 +753,16 @@ all evidence vanishes with it.
 You can set up the docker image so that things like the server log file survive.
 Read the docker manual to find out how.
 
-To avoid confusion:  to start the server use docker run and specify the image ID.
-Once it's running, refer to it using its container ID, not its image ID.
-The container lasts as long as you are running the image.
-The image lasts until you delete it.
-
 Whenever you change anything in the project, you need to run the docker build again.
 That will produce a new image with a different ID.
 
-To avoid tying up your git bash window, start the image like so:
+When you started the docker image earlier,
+it tied up your git bash window.
+To avoid that, start the image using this magic:
 
     sudo docker run {image_id} >/dev/null 2>&1 &
+
+(substituting your image ID)
 
 ">/dev/null" connects the command's standard output to a special file that just discards anything
 written to it.
@@ -586,19 +781,13 @@ If something goes wrong, we need to find out what happened
 by looking at the log.
 
 The docker container is a complete separate Linux environment
-and if you know its container ID you can run commands in it:
-
-    sudo docker ps
-
-    CONTAINER ID  IMAGE        COMMAND                CREATED         STATUS          PORTS      NAMES
-    f473f0749fd0  ca624f5eea74 "/bin/sh -c /usr/loc…" 10 minutes ago  Up 10 minutes   8000/tcp   determined_curie
-
-My container is f473f0749fd0
-
-The ps command shows you what programs are running in the container:
+and if you know its container ID you can run commands in it.
+For example, if the container id is f473f0749fd0,
+this will run the ps command in the container,
+which shows you what programs are running there:
 
     docker exec -tt f473f0749fd0 ps -aef
-
+    
     UID        PID  PPID  C STIME TTY          TIME CMD
     root         1     0  0 16:35 ?        00:00:00 /bin/sh -c ./ntripcaster
     root         6     1  0 16:35 ?        00:00:00 ./ntripcaster
@@ -606,24 +795,23 @@ The ps command shows you what programs are running in the container:
 
 The running programs include the ps that you are running to see this output.
 
-Going back to the original installation instructions that I quoted earlier,
-they say that to run the caster you should change directory to
-/usr/local/ntripcaster/bin
-and run the program from there.
-It will pick up the configuration files from
-/usr/local/ntripcaster/conf and write a log file
-in /usr/local/ntripcaster/bin:
+More potential confusion:
 
-Not quite.
-We saw earlier that it's picking up the configuration,
-but if we look in the logs directory,
-it's empty:
+    docker ps
 
-    docker exec -it f473f0749fd0 ls /usr/local/ntripcaster/logs
+is a docker command that lists the running containers.
 
-The ls command produces nothing, because there's nothing in there.
-The log is in the bin directory,
-because that was the current directory when we started the caster:
+     ps -aef
+
+is a linux command that lists the running programs.
+The two commands do similar jobs and one is named after the other.
+
+When we start the caster running,
+it produces a log file within the docker image.
+When it started,
+the current directory was /usr/local/ntripcaster/bin,
+so the log file is in there.
+We can see it using the ls command:
 
     root@audolatry:/home/simon/ntripcaster# docker exec -it f473f0749fd0 ls /usr/local/ntripcaster/bin
     
