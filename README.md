@@ -2,40 +2,46 @@
 
 This repository contains the BKG NTRIP caster set up to run under docker.
 
+NTRIP was invented by the German organisation Bundesamt für Kartographieund Geodäsie (BKG) - 
+in English, the Federal Agency for Cartography and Geodesy. 
+It's used to transmit corrections from a GNSS base station
+to a GNSS rover over the Internet.
+(GNSS is the general term for what we often call GPS.)
+Recently base stations and rovers have become much cheaper
+and you can buy a complete system for less than $1,000.
+
+BKG's caster implements NTRIP Version 1.
+It's free and open source.
+NTRIP is now at Version 2.
+BKG has a version 2 caster, but it's not free or open source.
+
 Docker provides a ready-made predictable environment in which you can build and run software.
 The steps to build and run a docker application are the same regardless of your operating system.
 
 Until docker came along,
-installing software like this on a computer was a nightmarish mess,
+installing software like this could be a nightmarish mess,
 because the environment provided by every computer was
 different and unpredictable - Windows 7, Windows 10, Ubuntu Linux, Red hat Linux
 or whatever,
 and usually with different optional software installed.
 
-When docker runs, it creates a stripped-down
-Linux environment on your computer
-within whichever operating system it's actually running
-it uses that to build an image,
-which then runs in a similar Linux environment.
-This irons out a huge number of annoying environmental issues.
+When docker runs an application, it creates a stripped-down
+Linux environment
+within whichever operating system your computer is actually running.
+This irons out most of the gotchas and makes success much more likely.
 
-The fact that each piece of docker software is encapsulated in its own environment
-also reduces problems caused by hidden interactions.
-Two parts can only communicate through well understood interfaces.
+Each docker application is encapsulated in its own environment,
+which also reduces problems caused by hidden interactions.
+Two applications can only communicate through well understood interfaces.
 
 This does mean that to put a solution together you may have to learn a few new skills,
 which is a cost,
-but most people find that the benefits of using docker far outweigh the costs.
+but most people find that the benefits of using docker far outweigh this.
 
-This document explains how to set up a suitable environment
+This document explains what NTRIP is,
+how to set up a suitable environment
 for your caster,
 how to build and run it and how to manage it once it's running.
-
-At the end of this document,
-I also explain what an NTRIP caster is.
-That may seem like a strange order,
-but NTRIP is fairly specialist and if you are reading this at all,
-you probably understand at least something about NTRIP.
 
 I should also say at the beginning that
 you don't necessarily need your own NTRIP caster.
@@ -49,7 +55,18 @@ read on.
 BKG's original build and installation instructions are
 [here](https://github.com/goblimey/ntripcaster/blob/master/ntripcaster/README.txt)
 They include some manual steps,
-to be followed once the software is built:
+to be followed once the software is built.
+Docker uses completely automated builds,
+so I've reworked things to allow this.
+With this version of the caster,
+you start by producing a couple of configuration files
+and the rest of the process is automatic.
+
+You just need to set up
+two configuration files called sourcetable.dat and ntripcaster.conf.
+The distribution includes an example of each file.
+
+The important bit of BKG's insructions is this:
 
 "Go to the configuration directory and rename "sourcetable.dat.dist" and
 "ntripcaster.conf.dist" to "sourcetable.dat" and "ntripcaster.conf".
@@ -77,27 +94,25 @@ BKG's instructions go on to say:
 to include the following line in that configuration file:
 CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home".
 
-That line is already in the example source table file.
+That line is already in the example source table file
+so you can just copy it.
 
-In this version of the caster
-the manual configuration steps are replaced by an automatic docker build process.
-You just need to set up
-two configuration files called sourcetable.dat and ntripcaster.conf
-before you run it.
-
+Apart from that first line,
 sourcetable.dat defines your mountpoints.
-Each mountpoint defines a name for an NTRIP base station.
+You need one for each base station.
 I have one base station.
 It's on the roof of my shed
 in Leatherhead in the UK.
 I call my mountpoint "uk_leatherhead".
 
-My sourcetable.dat looks like this:
+Each line of sourcetable.dat is a list of fields separate by semicolons.  Mine looks like this:
 
 ```
 CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home
 STR;uk_leatherhead;Leatherhead;RTCM 3.0;;;;;GBR;51.29;-0.32;1;0;sNTRIP;none;N;N;0;;
 ```
+
+Field 1 of the second line STR says that it's defining a mountpoint.
 
 Field 2 "uk_leatherhead" is the name of my mountpoint.
 
@@ -111,7 +126,7 @@ You can find the two and three letter code for your country
 If you don't know that,
 you can use "0.00;0.00".
 
-The file ntripcaster.conf defines all sorts of other things,
+The other file ntripcaster.conf defines all sorts of things,
 including the user names and password used to access the mountpoints.
 All base stations use the same password.
 There's no facility to specify a user name,
@@ -197,21 +212,23 @@ It will run until something goes wrong and it dies,
 or until it's forcibly shut down.
 
 For a quick check that it's working,
-use curl to fetch the home page.
-It should produce a copy of the source table:
+use curl to fetch the home page:
 
     curl http://localhost:2101/
 
 (That's http, NOT https.)
 
-This also tests that the caster can access its configuration files.
+That request should produce a copy of the source table.
+This tests that the caster is running and that it has found its configuration files.
 
 If that works,
-and you have curl installed on your local computer,
-try the same test across the network:
+and you have curl installed,
+you can run a similar test from your local computer
+to check that it works across the Internet:
 
     curl http://my.domain.name:2101/
 
+That should produce the same result.
 If the first test worked and this one doesn't,
 the most likely explanation is that you haven't arranged with your VPS provider
 to open up port 2101 to tcp traffic.
@@ -265,9 +282,156 @@ If you connect a base station, the source value will increase by one.
 If you connect a rover, the client value will increase by one.
 
 Use ctrl/c to stop the tail command.
-    
 
-## The Domain and the Server
+
+## NTRIP Basics
+There are a lot of acronyms in this field.
+I'll start by unpicking some of them.
+
+A Global Navigation Satellite System (GNSS) is a network of satellites 
+that allows a receiver on the Earth to find its positon accurately.
+The first and best-known was the 
+Global Positioning System (GPS),
+originally created by the American military for missile guidance.
+GNSS systems now include
+the European Galileo, the Russian GLONASS and the Chinese Baidou.
+Each has its own network of satellites
+(known as a "constellation").
+Many satellite navigation receivers
+are capable of picking up signals from all these systems and making use of any of them.
+
+A moving receiver (for example a hand-held device, or in a car, a boat or an aircraft)
+that can see enough satellites can find its position reasonably accurately,
+typically to within three or four metres.
+
+If the receiver knows that it's in a fixed position
+it can do better by repeatedly finding its position and averaging the results.
+Most receiver have some kind of "fixed" mode,
+where they assume that they are stationary.
+The result depends on the device and on how long you leave it taking averages.
+You can achieve maybe 1m accuracy this way.
+
+Dual-band GNSS Receivers are now available that can analyse
+two signals coming from the same satellite on different frequencies
+to get an even more acurate position -
+typically within half a metre.
+
+Apart from using GNSS to find the base station's position,
+you can use traditional surveying techniques
+and then simply tell the base station its position.
+
+A base station that knows its position accurately,
+it
+can send corrections to a nearby rover.
+Essentially the base station says "I know I'm here.
+The signal from satellite X says that I'm there,
+so it's wrong by this much."
+It sends out a stream of correction messages for each satellite that it can see.
+If the rover is close enough and can see the same satellites,
+it can use these data to correct the signals that it's receiving
+and get a better fix.
+If the rover is within about 10 Km of the base station
+and the base station knows its position perfectly,
+the rover can find its position within 2 cm.
+
+If the base station's notion of its position is slightly wrong,
+the rover's position will be wrong by the same amount.
+Imagine you move the rover around a site,
+measure the positions of various features and draw a map.
+Each position on the map will always be inaccurate by about 2 cm.
+Also, if the base station's notion of its position is half a metre to the North of where it really is,
+the whole map will be shifted by half a metre to the North.
+
+The Radio Technical Commission for Maritime Services (RTCM) produced a standard
+protocol for the corrections over a radio link.
+so a base station from one manufacturer can send corrections
+to a rover from another manufactuer.
+This is called the RTCM protocol.
+It's currently at version 3.
+
+RTCM over radio is used for all sorts of purposes
+including small drones.
+The drone contains a GNSS rover sending position information to its flight controller.
+The base station sits on the ground in a fixed position,
+sending GNSS corrections to the rover.
+The two are connected via Long Range (LoRa) radio.
+The operator can pre-program the drone to follow a path
+around a site,
+avoiding obstacles.
+This works well when the base station is in a prominent position
+and the rover is high in the air,
+so the two have line of site between them.
+
+If the rover is closer to the ground,
+for example in a hand-held tracker,
+feature such as buildings, trees and hedges can interfere
+with the radio connection and make it very flaky.
+To provide a better alternative,
+the Bundesamt für Kartographieund Geodäsie (BKG) defined
+the Network Transport of Rtcm via Internet Protocol (NTRIP)
+which replaces the radio link with an HTTP connection over the Internet.
+
+You can buy a base station off the shelf that sends corrections using NTRIP,
+and a rover that can receive and use them.
+Recently,
+the base stations have become much cheaper,
+and you can buy a complete system for less than $1,000.
+It's also much easier than it used to be to get an Internet connection -
+any smart phone can provide one.
+The smart phone can also provide a display
+for the rover,
+reducing the cost.
+
+For a device to find a target device
+on the Internet,
+the target needs a well-known address.
+To avoid every base station
+needing one of those, NTRIP uses three components,
+a caster, a server and a client.
+
+The caster broadcasts the data coming from one or more base stations.
+Each base station is represented in the caster by a mountpoint.
+All other components communicate via the caster,
+so only it needs a well-known address. 
+
+Each base station sends a series of HTTP requests to the caster,
+containing correction data in RTCM messages.
+
+The software to do this is called an NTRIP server.
+Crucially, it doesn't need a well-known Internet address.
+My base base station is currently in a shed in my back garden,
+connecting to a caster via my home broadband service.
+
+A client (a rover) sends a series of HTTP requests
+to the caster
+and gets back corrections from a mountpoint (a base station) in response.
+Since it matters how far apart the base station and rover are,
+the protocol includes a facility for the rover to find its nearest mountpoint.
+
+To use NTRIP,
+the rover must be connected to the Internet.
+While I was working on this project
+I did my testing using
+an Emlid Reach M+ as a hand-held rover,
+connected to my iPad over Bluetooth
+and using its Internet connection.
+The Reach is designed to work within a drone.
+As a hand-held rover
+it's a bit of a lashup,
+and I don't recommend it,
+but technically it worked quite well.
+
+For more professional applications such as surveying,
+companies such as Trimble and Leica
+sell hand-held GNSS devices that
+can receive corrections from an NTRIP caster.
+Obviously they would like you to use their correction service,
+but you don't have to.
+Trimble recently launched a budget product called the [Catalyst](https://geospatial.trimble.com/catalyst),
+which competes on price with my Reach device
+and looks much nicer.  
+
+## Getting a Domain and Server
 To run the caster, you need a server with a well-known name.
 You can achieve that by buying an Internet domain.
 Strictly you don't buy a domain.
@@ -283,6 +447,8 @@ because their initial registration fees and their subsequent
 renewal fees are both reasonable.
 When choosing a registrar,
 always check the renewal fees.
+Beware of introductory offers
+that cost you a lot more later.
 
 Once you have your domain name,
 you need a computer on the Internet
@@ -342,22 +508,15 @@ These instructions assume that
 you are running MS Windows on your local machine
 (because most people do)
 and that your VPS is running
-the Linux operation system.
-If you are running Windows on it,
+the Linux operation system
+(becasue that's also what most people do).
+If you are running Windows on your VPS,
 the procedure to connect will be similar but different.
 You need to
 consult your VPS supplier about that.
 The docker commands will be the same.
 
-Assuming that you have an ssh tool installed,
-connect to your VPS:
-
-    ssh user@my.domain.name
-
-If you don't know anything about ssh,
-I explain more in a later section.
-
-There are various ways to connect to a VPS.
+There are various ways to connect to your VPS.
 The ssh command is probably the most common.
 Your Windows machine can't do that out of the box,
 you need to install some software.
@@ -367,13 +526,9 @@ Once you've installed that,
 go to your start menu and run Git Bash.
 That starts a command window and you can run ssh in that.
 
-To connect to your VPS you need a user name and password.
-You also need your domain name.
-
-
-
+To connect to your VPS you need your user name and your domain name.
 If your user name is "user" and your domain is "my.domain.name",
-connect to your VPS like so:
+connect like so:
 
     ssh user@my.domain.name
 
@@ -385,22 +540,21 @@ your private key installed and the machine you are connecting to
 has your public key installed,
 you don't need a password.
 
-If you didn't create a key pair,
-you will be asked for your password when you connect to your VPS,
-so you can connect that way from any computer,
+If you didn't create keys,
+you will be asked for your password when you connect to your VPS.
+That means you can connect to it from any computer,
 but so can anybody else who can guess your password.
 If you created a key pair,
 your VPS should be set up so that
-it's only possible to connect from a computer that holds a copy of the private key.
-That's less convenient but much more secure.
-
+it's only possible to connect from a computer that holds a copy of the private key. 
 (So now would be a very good time to make a backup copy of your key pair
 on a memory stick.)
 
-Logging in withb a key pair is not just convenient,
-it's much more secure.
+Logging in with a key pair means that you don't have to remember yet another password.
+That's not just convenient,
+it's also much more secure.
 Your VPS supplier should have arranged that
-it's not possible to log in over the network using a password.
+it's not possible for anybody to log in over the network using a password.
 
 To see why, once you are connected to your VPS, try this:
 
@@ -460,7 +614,8 @@ Aug 29 10:22:29 audolatry sshd[28412]: Connection reset by 49.88.112.85 port 138
 
 The line that says "Accepted publickey for root" is me connecting using my key.
 The rest show other
-people all round the world trying to connect to my VPS
+people all round the world trying every few seconds
+to connect to my VPS
 by guessing user names and passwords.
 Ths will have started as soon as my domain was created
 and announced.
@@ -559,7 +714,8 @@ The mouse doesn't work.
 When you have finished editing the file,
 use ctrl/o to write your changes and ctrl/x to exit.
 
-Now you can build your caster.
+Once you've created those two configuration files,
+you can use docker to build your caster.
 The Dockerfile in the top level directory of your project looks something like this:
 
 ```
@@ -860,8 +1016,9 @@ Both will need
 the server URL, port (2101),
 and mountpoint name.
 The base station should use the encoder password
-(and I'm guessing, any user name).
-The rover will need the user name and password for the mountpoint.
+(and any user name).
+The rover will need the user name and password for the mountpoint
+that it's going to use.
 
 When any of your devices connect to the caster,
 you should see some activity in the caster's log
@@ -889,137 +1046,44 @@ including any configuration tweaks,
 you can use docker to build the project and run the result.
 This section may be useful if you want to do that.
 
-This caster implements NTRIP version 1.
-BKG went on to define NTRIP version 2.
-They sell a version that implements that,
-but there is no free version
-as far as I know.
+The software is built using the make command.
+There is a file called makefile in each directory that tells make what to do.
+
+The configure command runs another command automake
+which creates each makefile from a template
+called makefile.in and the settings in makefile.am. 
 
 To automate the manual configuration step,
 I edited Makefile.am and Makefile.in
 in the conf directory.
-These are used by the initial configuration phase
-to create Makefile.
-That controls what the "make install" command does during
-the installation phase.
-The etc_DATA setting controls the files that are copied:
+The etc_DATA setting controls the files that are copied
+from that directory when the software is installed.
+The original contains:
 
     etc_DATA = ntripcaster.conf.dist sourcetable.dat.dist
     
-becomes
+so only those two files are copied.
+
+In my version that becomes
 
     etc_DATA = ntripcaster.conf.dist sourcetable.dat.dist ntripcaster.conf sourcetable.dat
 
-This sets up the Makefle so that when you run "make install",
+Now when docker runs "make install",
 it copies four files from the conf directory rather than two.
-This allows you to set up ntripcaster.conf and sourcetable.dat
-as you need before you build the project.
 
-Theoretically, Makefile.in is derived from Makefile.am
-when you run ./configure
-so I'm not sure why it's necessary to edit both files,
-but it is.
+So you just have to create ntripcaster.conf and sourcetable.dat
+and then run docker.
+It runs configure, which runs automake to create the makefiles,
+then it runs make to build and install the software.
 
-## NTRIP Basics
-There are a lot of acronyms in this field.
-I'll start by unpicking some of them.
-
-A Global Navigation Satellite System (GNSS) is a network of satellites 
-that allows a receiver on the Earth to find its positon accurately.
-The first and best-known was the 
-Global Positioning System (GPS),
-originally created by the American military for missile guidance.
-GNSS systems now include
-the European Galileo, the Russian GLONASS and the Chinese Baidou.
-Each has its own network of satellites
-(known as a "constellation").
-Many satellite navigation receivers
-are capable of picking up signals from all these systems and making use of any of them.
-
-A moving receiver (for example a hand-held device, or in a car, a boat or an aircraft)
-that can see enough satellites can find its position reasonably accurately,
-typically to within three or four metres.
-
-If the receiver knows that it's in a fixed position
-it can do better by repeatedly finding its position and averaging the results.
-Dual-band GNSS Receivers are now available that can analyse
-two signals coming from the same satellite on different frequencies
-to get an even more acurate position.
-
-A base station that knows its position accurately,
-it
-can send corrections to a nearby rover.
-
-Essentially the base station says "I know I'm here.
-The signal from satellite X says that I'm there,
-so it's wrong by this much."
-It sends a stream of correction messages to the rover,
-which uses them to correct the position that it's receiving
-from the same satellite.
-
-Apart from using GNSS to find the base station's position,
-the operator can use traditional surveying techniques
-and then configure the base station accordingly.
-The more accurately the position is set,
-the more accurate the rover's position will be.
-
-If the rover is within about 10 Km of the base station
-and the base station knows its position perfectly,
-the rover can find its position within 2 cm.
-If the base station position is wrong by, say, 5 cm in one direction,
-then each corrected position that the rover produces will be shifted by
-5cm in the same direction.
-
-The Radio Technical Commission for Maritime Services (RTCM) produced a standard
-protocol for the corrections over a radio link.
-so a base station from one manufacturer can send corrections
-to a rover from another manufactuer.
-This is called the RTCM protocol.
-It's currenty at ersion 3.
-
-Radio connections can be a bit flaky
-and these days it's much easier than it used to be to get Internet access.
-The Network Transport of Rtcm via Internet Protocol (NTRIP)
-replaces the radio link with a connection over the Internet
-using HTTP.
-NTRIP was invented by the German 
-Bundesamt für Kartographieund Geodäsie (BKG) -
-in English, the Federal Agency for Cartography and Geodesy.
-You can buy a base station off the shelf that sends corrections using NTRIP,
-and a rover that can receive and use them.
-Recently,
-the base stations have become much cheaper,
-and you can buy a complete system for less than $1,000.
-
-For a device to find a target device
-on the Internet,
-the target needs a well-known address.
-To avoid every base station
-needing one of those, NTRIP uses three components,
-a caster, a server and a client.
-
-The caster broadcasts the data coming from one or more base stations.
-Each base station is represented in the caster by a mountpoint.
-All other components communicate via the caster,
-so only it needs a well-known address. 
-
-Each base station sends a series of HTTP requests to the caster,
-containing correction data in RTCM messages.
-
-The software to do this is called an NTRIP server.
-Crucially, it doesn't need a well-known Internet address.
-My base base station is currently in a shed in my back garden,
-connecting to a caster via my home broadband service. 
-
-A cient (the rover) sends a series of HTTP requests
-to the caster
-and gets back corrections from a mountpoint (base station) in response.
-Since it matters how far apart the base station and rover are,
-the protocol includes a facility for the rover to find its nearest mountpoint.
-
-To use NTRIP,
-the rover must be connected to the Internet.
-This can be done via a mobile phone and a Bluetooth link.
+Actually, what's supposed to happen is that the template Makefile.in is
+edited by automake based on the settings in Makefile.am,
+so it should only be necessary to change makefile.am.
+I think what's happened is that somebody has run configure
+and then committed the result,
+so I've inherited a Makefile.in that is not the original version.
+Ah well,
+that's the fun world of open-source software for you.
 
 ## Commercial NTRIP services
 A number of GNSS devices can send and receive NTRIP corrections,
