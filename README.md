@@ -509,7 +509,7 @@ you are running MS Windows on your local machine
 (because most people do)
 and that your VPS is running
 the Linux operation system
-(becasue that's also what most people do).
+(because that's also what most people do).
 If you are running Windows on your VPS,
 the procedure to connect will be similar but different.
 You need to
@@ -674,7 +674,7 @@ For Ubuntu, it's:
 
     sudo apt install docker.io
     
-The Docker service needs to be set up to run when your VPS machne starts up:
+The Docker service needs to be set up to run when your VPS machine starts up:
 
     sudo systemctl start docker
     
