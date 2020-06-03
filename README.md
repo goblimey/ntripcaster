@@ -160,7 +160,7 @@ There is one line per mountpoint:
 In this file, the mountpoint names must start with "/"
 (but not in sourcetable.dat).
 
-You don't need to give create usernames and passwords:
+You don't need to create usernames and passwords:
 
 ```
 /uk_leatherhead
