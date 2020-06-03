@@ -149,26 +149,26 @@ server_name igs.ifag.de             # substitute your.domain.name
 
 ```
   
-The last two lines of the file specify the user names and passwords
-that rovers must use to access the mountpoints:
+The last few lines of the file specify the user names and passwords
+that rovers must use to access the mountpoints.
+There is one line per mountpoint:
 
 ```
-/BUCU0:user1:password1,user2:password2
-/PADO0
+/uk_leatherhead:user1:password1,user2:password2
 ```
 
 In this file, the mountpoint names must start with "/"
 (but not in sourcetable.dat).
 
-That second mountpoint has no username or password
-so it's public -
-any rover can connect to it.
+You don't need to give create usernames and passwords:
 
-In the example the names are in upper case.
-They don't have to be
-but whatever you choose,
-you must use the same case when configuring your rover -
-bucu0, Bucu0 and BUCU0 are all different names.
+```
+/uk_leatherhead
+```
+That mountpoint is then public - any rover can connect to it.
+
+The mountpoint names are case sensitive -
+"MY_MOUNTPOINT", "My_Mountpoint" and "my_mountpoint" are all different names.
 
 ## Quick Instructions
 These instructions are for those readers
@@ -237,7 +237,22 @@ to open up port 2101 to tcp traffic.
 but modern versions of chrome have gone all https
 and it doesn't seem to like http requests anymore.)
 
-The caster writes a log file which you can use to debug problems.
+### The Log File
+
+The caster creates a log file as it runs,
+which you can use to debug problems.
+To see the log have to know the ID of the docker container
+which is running the caster:
+```
+sudo docker ps
+```
+That produces a list of running docker containers, something like:
+```
+CONTAINER ID  IMAGE        COMMAND                CREATED        STATUS       PORTS     NAMES
+a5666adfd5d5  68b1841290ef "/bin/sh -c /usr/loc…" 2 minutes ago  Up 2 minutes 2101/tcp  happy_bassi
+```
+So docker is running one image, the caster. Its container ID is a5666adfd5d5.
+
 BKG's original installation instructions say
 that to run the caster you should change directory to
 /usr/local/ntripcaster/bin
@@ -251,13 +266,13 @@ We saw earlier that it's picking up the configuration,
 but if we look in the logs directory,
 it's empty:
 
-    docker exec -it {image_id} ls /usr/local/ntripcaster/logs
+    docker exec -it {container_id} ls /usr/local/ntripcaster/logs
 
 The ls command produces nothing, because there's nothing in there.
 The log is actually in the bin directory,
 because that was the current directory when we started the caster:
 
-    docker exec -it {image_id} ls /usr/local/ntripcaster/bin
+    docker exec -it {container_id} ls /usr/local/ntripcaster/bin
     
     ntripcaster  ntripcaster.log
 
@@ -265,7 +280,7 @@ You can track what's written to the log using the tail command.
 The -f option makes tail run forever,
 displaying new lines as they arrive:
 
-    docker exec -it {image_id} tail -f /usr/local/ntripcaster/bin/ntripcaster.log
+    docker exec -it {container_id} tail -f /usr/local/ntripcaster/bin/ntripcaster.log
 
     [29/Aug/2019:16:55:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
     [29/Aug/2019:16:56:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
@@ -878,25 +893,11 @@ into the address bar of your web browser,
 but they are beginning to support https only,
 and this request is http, so it may not work.
 
-Now you can shut down the server.  First you must find the ID of the running image:
-
-    sudo docker ps
-
-That produces a list of running docker containers,
-something like:
-    
-    CONTAINER ID  IMAGE        COMMAND                CREATED        STATUS       PORTS     NAMES
-    a5666adfd5d5  68b1841290ef "/bin/sh -c /usr/loc…" 2 minutes ago  Up 2 minutes 2101/tcp  happy_bassi
-
-So docker is running one image, the caster.  Its container ID is a5666adfd5d5.
-Stop that container like so:
-
-    sudo docker stop a5666adfd5d5
+Now you can shut down the server.  First you must find the ID of the running container,
+as described above (in the section on the log file).
 
 To avoid confusion:  to start the server use docker run and specify the image ID.
 Once it's running, refer to it using its container ID, not its image ID.
-The container lasts as long as you are running the image.
-The image lasts until you delete it.
 
 When the container stops,
 the Linux image that was running
@@ -908,6 +909,11 @@ all evidence vanishes with it.
 
 You can set up the docker image so that things like the server log file survive.
 Read the docker manual to find out how.
+
+When you use docker,
+there's also all sorts of tidying you have to do -
+removing old image files and containers.
+Again, you need to read the manual,
 
 Whenever you change anything in the project, you need to run the docker build again.
 That will produce a new image with a different ID.
