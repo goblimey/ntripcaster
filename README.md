@@ -10,6 +10,15 @@ to a GNSS rover over the Internet.
 Recently base stations and rovers have become much cheaper
 and you can buy a complete system for less than $1,000.
 
+Your caster softtware has to run on a server with a well-known name.
+If you have your own network of Windows machines
+and you know how to configure them,
+you may be able to get the caster working on one of those.
+Here I assume that you are going to set it up on a server on the Internet with a proper domain name.
+Nowadays, that's fairly cheap,
+and it's one less machine to manage.
+(I use a Digital Ocean droplet that costs me $5 per month.)
+
 BKG's caster implements NTRIP Version 1.
 It's free and open source.
 NTRIP is now at Version 2.
@@ -66,7 +75,11 @@ You just need to set up
 two configuration files called sourcetable.dat and ntripcaster.conf.
 The distribution includes an example of each file.
 
-The important bit of BKG's insructions is this:
+There's a copy of BKG's documentation
+[here](https://github.com/goblimey/ntripcaster/blob/master/ntripcaster/conf/NtripSourcetable.doc).
+It may make more sense if you look at the example configuration files while you are reading it.
+
+The important part is this:
 
 "Go to the configuration directory and rename "sourcetable.dat.dist" and
 "ntripcaster.conf.dist" to "sourcetable.dat" and "ntripcaster.conf".
@@ -76,26 +89,24 @@ you have to specify the name of the machine the server is running on
 (no IP adress!!) and you can adapt other settings, like the listening ports,
 the server limits and the access control."
 
-The file NtripSourcetable.doc is
-[here](https://github.com/goblimey/ntripcaster/blob/master/ntripcaster/conf/NtripSourcetable.doc).
-It may make more sense if you look at the example configuration files while you are reading it.
+### sourcetable.dat
 
-That comment about "no IP address" means that the caster has to run on a server with a well-known name.
-If you have your own network of Windows machines
-and you know how to configure them,
-you may be able to get the caster working on one of those.
-Here I assume that you are going to set it up on a server on the Internet with a proper domain name.
-Nowadays, that's fairly cheap,
-and it's one less machine to manage.
+Copy the example file:
 
-BKG's instructions go on to say:
+```
+$ cp sourcetable.dat.dist sourcetable.dat
+```
 
-"Whatever the content of your "sourcetable.dat" finally might be, it is recommended
+and edit sourcetable.dat to suit your needs.
+
+BKG's instructions say:
+"Whatever the content of your "sourcetable.dat" finally might be,
+it is recommended
 to include the following line in that configuration file:
 CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home".
 
 That line is already in the example source table file
-so you can just copy it.
+so you can just leave it.
 
 Apart from that first line,
 sourcetable.dat defines your mountpoints.
@@ -112,7 +123,7 @@ CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntr
 STR;uk_leatherhead;Leatherhead;RTCM 3.0;;;;;GBR;51.29;-0.32;1;0;sNTRIP;none;N;N;0;;
 ```
 
-Field 1 of the second line STR says that it's defining a mountpoint.
+Field 1 of the second line is "STR" which says that it's defining a mountpoint.
 
 Field 2 "uk_leatherhead" is the name of my mountpoint.
 
@@ -126,12 +137,25 @@ You can find the two and three letter code for your country
 If you don't know that,
 you can use "0.00;0.00".
 
-The other file ntripcaster.conf defines all sorts of things,
+### ntripcaster.conf
+
+Copy the example file:
+
+```
+$cp ntripcaster.conf.dist ntripcaster.conf
+```
+
+and edit ntripcaster.conf to suit your needs.
+The other file defines all sorts of things,
 including the user names and password used to access the mountpoints.
+
+There's a password for the base stations.
 All base stations use the same password.
 There's no facility to specify a user name,
 so your base station can use any user name.
-The rovers use different user names and passwords according to which mountpoint they connect to.
+
+There is a separate set of usernames and passords for each mountpoint
+which the rovers need to supply when they connect.
 
 The lines you need to change are scattered through the file:
 
@@ -149,13 +173,15 @@ server_name igs.ifag.de             # substitute your.domain.name
 
 ```
   
-The last few lines of the file specify the user names and passwords
-that rovers must use to access the mountpoints.
-There is one line per mountpoint:
+The last few lines of the file specify the user names and passwords.
+You need one line for each of the mountpoints you specified in sourcetable.dat. 
+The rovers use these to access the mountpoints.
+For example:
 
 ```
 /uk_leatherhead:user1:password1,user2:password2
 ```
+creates user names "user1" and "user2" whic a rover can use to connect to that mountpoint.
 
 In this file, the mountpoint names must start with "/"
 (but not in sourcetable.dat).
@@ -165,7 +191,7 @@ You don't need to create usernames and passwords:
 ```
 /uk_leatherhead
 ```
-That mountpoint is then public - any rover can connect to it.
+creates a public mountpoint - any rover can connect to it.
 
 The mountpoint names are case sensitive -
 "MY_MOUNTPOINT", "My_Mountpoint" and "my_mountpoint" are all different names.
