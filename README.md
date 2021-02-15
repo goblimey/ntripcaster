@@ -196,7 +196,8 @@ creates a public mountpoint - any rover can connect to it.
 The mountpoint names are case sensitive -
 "MY_MOUNTPOINT", "My_Mountpoint" and "my_mountpoint" are all different names.
 
-## Quick Instructions
+## Quick Instructions For Building
+
 These instructions are for those readers
 who are familiar with concepts such as docker,
 remote management of computers,
@@ -206,21 +207,36 @@ continue to the next section.
 
 Run these commands on your server:
 
-    git clone git://github.com/goblimey/ntripcaster.git
-    cd ntripcaster/ntripcaster/conf
-    cp ntripcaster.conf.dist.in ntripcaster.conf
+```
+git clone git://github.com/goblimey/ntripcaster.git
+cd ntripcaster/ntripcaster/conf
+cp ntripcaster.conf.dist.in ntripcaster.conf
+```
 
 Edit your configuration files as explained above.
 
-Then build your docker image:
+Move back to the top level of the project and build your docker image:
 
-    cd ../..
-    sudo docker build .
+```
+cd ../..
+sudo docker build . -t ntripcaster
+```
 
+The build will take a little while and at the end you should see something like this:
+
+```
+Step 11/11 : CMD /usr/local/ntripcaster/bin/ntripcaster
+ ---> Running in a13e5bbd3545
+Removing intermediate container a13e5bbd3545
+ ---> fc4f331c1db4
+Successfully built fc4f331c1db4
+Successfully tagged ntripcaster:latest
+```
 Run it like so:
 
-    sudo docker run -p2101:2101 {image_id} >/dev/null 2>&1 &
-
+```
+sudo docker run -p2101:2101 ntripcaster >/dev/null 2>&1 &
+```
 The caster runs on port 2101.
 The -p option publishes that port and makes it available to the outside world
 on the same port of the VPS.
