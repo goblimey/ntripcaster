@@ -196,7 +196,7 @@ creates a public mountpoint - any rover can connect to it.
 The mountpoint names are case sensitive -
 "MY_MOUNTPOINT", "My_Mountpoint" and "my_mountpoint" are all different names.
 
-## Quick Instructions For Building
+## Quick Instructions For Building and Running the Caster
 
 These instructions are for those readers
 who are familiar with concepts such as docker,
@@ -253,10 +253,23 @@ that you used to start it.
 It will run until something goes wrong and it dies,
 or until it's forcibly shut down.
 
-For a quick check that it's working,
+To view the running caster:
+
+```
+sudo docker ps
+```
+That produces a list of running docker containers, something like this:
+```
+CONTAINER ID  IMAGE        COMMAND                 CREATED             STATUS              PORTS                    NAMES
+fb90a0a44e14  ntripcaster  "/bin/sh -c /usr/loc…"  16 minutes ago      Up 16 minutes       0.0.0.0:2101->2101/tcp   great_sammet
+```
+So docker is running one container, the caster. Its container ID is fb90a0a44e14.
+You need that ID for various control purposes.
+
+For a quick check that the caster is working,
 use curl to fetch the home page:
 
-    curl http://localhost:2101/
+    curl --http0.9 http://goblimey.com:2101/
 
 (That's http, NOT https.)
 
@@ -279,23 +292,34 @@ to open up port 2101 to tcp traffic.
 but modern versions of chrome have gone all https
 and it doesn't seem to like http requests anymore.)
 
+### Stopping the Caster
+
+The caster will run until you stop it or reboot the server machine.
+
+To stop the container you need to find its container ID as shown earlier.
+Given that, stop it like so:
+
+```
+docker kill {container_id}#
+```
+
+For example:
+
+```
+docker kill fb90a0a44e14
+```
+
+
 ### The Log File
 
 The caster creates a log file as it runs,
 which you can use to debug problems.
-To see the log have to know the ID of the docker container
-which is running the caster:
-```
-sudo docker ps
-```
-That produces a list of running docker containers, something like:
-```
-CONTAINER ID  IMAGE        COMMAND                CREATED        STATUS       PORTS     NAMES
-a5666adfd5d5  68b1841290ef "/bin/sh -c /usr/loc…" 2 minutes ago  Up 2 minutes 2101/tcp  happy_bassi
-```
-So docker is running one image, the caster. Its container ID is a5666adfd5d5.
+To see the log have to know the ID of the container:
 
-BKG's original installation instructions say
+ fb90a0a44e14.
+
+BKG's original installation instructions sare slightly misleading.
+they say
 that to run the caster you should change directory to
 /usr/local/ntripcaster/bin
 and run the program from there.
@@ -310,13 +334,14 @@ it's empty:
 
     docker exec -it {container_id} ls /usr/local/ntripcaster/logs
 
-The ls command produces nothing, because there's nothing in there.
-The log is actually in the bin directory,
+The log is actually in the bin directory within the container,
 because that was the current directory when we started the caster:
 
-    docker exec -it {container_id} ls /usr/local/ntripcaster/bin
+```
+$ docker exec -it {container_id} ls /usr/local/ntripcaster/bin
     
-    ntripcaster  ntripcaster.log
+ntripcaster  ntripcaster.log
+```
 
 You can track what's written to the log using the tail command.
 The -f option makes tail run forever,
@@ -346,7 +371,7 @@ There are a lot of acronyms in this field.
 I'll start by unpicking some of them.
 
 A Global Navigation Satellite System (GNSS) is a network of satellites 
-that allows a receiver on the Earth to find its positon accurately.
+that allows a receiver on the Earth to find its position accurately.
 The first and best-known was the 
 Global Positioning System (GPS),
 originally created by the American military for missile guidance.
