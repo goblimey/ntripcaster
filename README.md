@@ -205,12 +205,39 @@ domain names, virtual private servers and so on.
 If you are not one of those people,
 continue to the next section.
 
-Run these commands on your server:
+The caster must run on a server machine with a publshed IP address.
+I run mine on a Digital Ocean Droplet that costs $5 per month.
+Other providers of virtual private servers are available.
+The server must have an Internet domain name,
+so you need to buy one of those and assign it to your server.
+(If you don't understand any of that,
+read the more detailed explanation below.)
+
+Log int to you server via a command window and
+install git and docker:
+
+```
+sudo apt update
+sudo apt install git docker.io
+```
+
+Download the caster:
 
 ```
 git clone git://github.com/goblimey/ntripcaster.git
+```
+
+That creates a directory ntripcaster.
+Inside that is another directory with the same name
+plus a couple of other files.
+Inside the lower ntripcaster directory
+is the conf directory,
+where you create your configuration files:
+
+```
 cd ntripcaster/ntripcaster/conf
-cp ntripcaster.conf.dist.in ntripcaster.conf
+cp ntripcaster.conf.dist ntripcaster.conf
+cp sourcetable.dat.dist sourcetable.dat
 ```
 
 Edit your configuration files as explained above.
