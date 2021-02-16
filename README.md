@@ -265,6 +265,14 @@ Here it's the user "gps".)
 sudo usermod -aG docker gps
 ```
 
+The Docker service needs to be set up to run whenever your server machine starts up:
+
+```
+sudo systemctl start docker
+    
+sudo systemctl enable docker
+```
+
 Download the caster:
 
 ```
@@ -401,26 +409,23 @@ It will then pick up the configuration files from
 in /usr/local/ntripcaster/logs.
 
 Not quite.
-We saw earlier that it's picking up the configuration,
-but if we look in the logs directory,
-it's empty:
-
-    docker exec -it {container_id} ls /usr/local/ntripcaster/logs
-
-The log is actually in the bin directory within the container,
-because that was the current directory when we started the caster:
+When the server starts up it creates a log file in the current drectory,
+so the docker image moves to /usr/local/ntripcaster/logs
+and runs the caster software from there,
+so the log ends up in the right place:
 
 ```
-$ docker exec -it {container_id} ls /usr/local/ntripcaster/bin
-    
-ntripcaster  ntripcaster.log
+docker exec -it {container_id} ls /usr/local/ntripcaster/logs
+
+ntripserver.log
 ```
+
 
 You can track what's written to the log using the tail command.
 The -f option makes tail run forever,
 displaying new lines as they arrive:
 
-    docker exec -it {container_id} tail -f /usr/local/ntripcaster/bin/ntripcaster.log
+    docker exec -it {container_id} tail -f /usr/local/ntripcaster/logs/ntripcaster.log
 
     [29/Aug/2019:16:55:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
     [29/Aug/2019:16:56:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
@@ -802,18 +807,22 @@ otherwise you could lock yourself out as well as the hackers.
 That's the security sermon over.  Now let's build an NTRIP caster.
 
 ## Installing the Caster
+
 There's a user called root that has special privileges.
 You need them to install things.
 Your VPS supplier may set things up so that you log in
-using another user that doesn't have those privileges.
+using another user that doesn't have those privileges,
+but can get them.
+
 If so,
-you can get the extra privileges by putting "sudo" at the start of any command.
+you get the extra privileges by putting "sudo" at the start of any command.
 Forcing you to use sudo is safer because those privileges also allow you to make disastrous mistakes.
 Having to start each dangerous command with "sudo" is a reminder to be careful.
 Using docker makes things even safer,
 because it automates all of the dangerous operations. 
 
-You can also add the sudo if you are root.
+You can also add the sudo if you are logged in as
+the root user, but it's not ncssary.
 It only wastes time,
 it doesn't do any harm.
 I'm going to add sudo to all commands that need it,
@@ -823,44 +832,19 @@ and you can just copy and paste them into your git bash window.
 you can't use the usual Windows shortcut ctrl/v to paste into the ssh window.
 Right click and a small menu appears with a paste option.)
 
-First, install docker on your VPS.
-How you do that depends on which version of Linux you are running
-on your VPS.
-For Ubuntu, it's:
+Run the commands shown earlier, starting with:
 
     sudo apt install docker.io
     
-The Docker service needs to be set up to run when your VPS machine starts up:
 
-    sudo systemctl start docker
-    
-    sudo systemctl enable docker
 
-Next fetch my caster project:
+To fetch the caster project, you did this:
 
     git clone git://github.com/goblimey/ntripcaster.git
-    cd ntripcaster
-    ls
-    
-    Dockerfile  LICENSE  README.md  ntripcaster
 
 That creates a directory called ntripcaster
-and moves into it.
-(You don't need any privilege to do that,
-so you don't need sudo.)
-The "ls" command lists the contents of the directory.
-It contains four files including Dockerfile and another directory,
-also called ntripcaster.
-Within that, there's a directory called conf.
-You need to create files in there
-as explained in the earlier section
-Configuration Files.
 
-    cd ntripcaster/conf
-    cp sourcetable.dat.dist sourcetable.dat
-    cp ntripcaster.conf.dist.in ntripcaster.conf
-
-If you are not familiar with Linux, use the editor nano:
+If you are not familiar with Linux, use the editor nano to edit the configuration files, for example:
 
     nano sourcetable.dat
 
@@ -871,11 +855,11 @@ When you have finished editing the file,
 use ctrl/o to write your changes and ctrl/x to exit.
 
 Once you've created those two configuration files,
-you can use docker to build your caster.
+the instructions tell you to use docker to build your caster.
 The Dockerfile in the top level directory of your project looks something like this:
 
 ```
-FROM ubuntu:18.04
+FROM ubuntu:18.04 as builder
 
 COPY ntripcaster /ntripcaster
 
@@ -887,19 +871,29 @@ RUN ./configure
 
 RUN make install
 
+# The builder image is dumped and a fresh image is used
+# just with the built binary, config and logs made from 'make install'
+FROM ubuntu:18.04
+COPY --from=builder /usr/local/ntripcaster/ /usr/local/ntripcaster/
+
 EXPOSE 2101
-
-WORKDIR /usr/local/ntripcaster/bin
-
-CMD ./ntripcaster
+WORKDIR /usr/local/ntripcaster/logs
+CMD /usr/local/ntripcaster/bin/ntripcaster
 ```
 
 The directives in the Dockerfile
-automate a build process which is similar to the steps described by
+automate a build and deploy process which is similar to the steps described by
 BKG's original installation instructions shown above.
+Tit runs in two stages.
+The first stage installs the software needed to build the executable program,
+and then builds it.
+That's done just once when you run the the "docker build" command.
+That material is then all cleared away.
+When you run the server using "docker run" that invokes
+just the second stage,
+which takes the built executable program and runs it.
 
-
-FROM defines which version of Linux docker will run, in this case Ubuntu 18.4.
+The first FROM directive defines which version of Linux docker will run the build stage, in this case Ubuntu 18.4.
 Check the website for Linux distribution you are using
 and choose the latest stable version.
 For Ubuntu, that's [this page](https://ubuntu.com/#download).
@@ -918,127 +912,47 @@ The second one uses them to configure the caster for this Linux environment
 and the third one uses the make tool to build and install
 the caster.
 
+The second FROM directive starts the second stage.
+Again it specifies which version of Ubuntu to use.
+
+the COPY directive fetches the executable program produced by the build stage.
+
 When the caster runs, it accepts network connections on port 2101.
 The EXPOSE allows the rest of the system to access that port.
 
 The next directive WORKDIR sets the working directory when the docker image is run.
+When the program starts running it creates a log file in the current directory.
+The workdir sets that to /usr/local/ntripcaster/logs.
 
-Finally, RUN runs a command when the docker image is started.
-It runs the caster.
+The CMD directive runs a command when the docker image is started.
+In this case the container will run the caster with the WORKDIR as the current directory.
+The container runs until that program terminates.
+Normally it runs indefinitely.
  
-You are currently in the directory ntripcaster/ntripcaster/conf.
-Move back to the top level directory of your project
-(the one that contains Dockerfile)
-and build your image: 
+To build your docker image, you move to the top level directory of the project and run:
 
-    cd ../..
-    sudo docker build .
+    docker build .
 
-Note the "." in the docker command.
-That means "the current directory".
+Note the "." which
+means "the current directory".
 Docker looks in the given directory for a file called Dockerfile
 and obeys the directives in it. 
 
-That should produce output showing what it's doing.
-It will take a few minutes.
-If all goes well,
-the last line should be something like:
-
-    Successfully built 68b1841290ef
-
-which means that it's built a docker image called
-68b1841290ef.
-
-You get a different image name each time you do this.
-
 Run the image like so:
 
-    sudo docker run -p2101:2101 68b1841290ef
+    docker run -p2101:2101 ntripcaster
 
-The -p connects port 2101 of the docker image to port 2101 of the host machine,
-in this case, your VPS.
+The -p connects port 2101 of the docker image to port 2101 of the mchine on which you are running.
  
-Running the image will produce something like:
-
-	NtripCaster Version 0.1.5 Initializing...
-	NtripCaster comes with NO WARRANTY, to the extent permitted by law.
-	You may redistribute copies of NtripCaster under the terms of the
-	GNU General Public License.
-	For more information about these matters, see the file named COPYING.
-	Starting thread engine...
-	[28/Aug/2019:15:21:56] Using stdout as NtripCaster logging window
-	[28/Aug/2019:15:21:56] Starting main connection handler...
-	[28/Aug/2019:15:21:56] NtripCaster Version 0.1.5 Starting..
-	[28/Aug/2019:15:21:56] Listening on port 2101...
-	[28/Aug/2019:15:21:56] Using (your domain name) as servername...
-	[28/Aug/2019:15:21:56] Server limits: 100 clients, 100 clients per source, 40 sources
-	[28/Aug/2019:15:21:56] Starting Calender Thread...
-	[28/Aug/2019:15:21:56] Bandwidth:0.000000KB/s Sources:0 Clients:0
  
 The "docker run" ties up your git bash window.
-Start another and use ssh to connect to your VPS as before.
+You can start another and use ssh to connect to your server machine as before.
 
-An NTRIP server responds to http requests.
-Using the curl command you can send a request
-to the server for its home page and see the result:
+Killing the docker container stops the service:
 
-    $ curl http://localhost:2101/
-    
-That should produce something like this:
-
-    SOURCETABLE 200 OK
-    Server: NTRIP NtripCaster 0.1.5/1.0
-    Content-Type: text/plain
-    Content-Length: 483
-    
-    CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home
-    STR;uk_leatherhead;Leatherhead;RTCM 3.0;;;;;GBR;51.29;-0.32;1;0;sNTRIP;none;N;N;0;;
-    ENDSOURCETABLE
-
-which is the contents of your sourcetable.dat,
-preceded by some HTTP header lines.
-
-Meanwhile,
-your first git bash windows should still be displaying the server log.
-Each request for the source table produces an exra line:
-
-    Kicking unknown 1 [172.17.0.1] [Sourcetable transferred], connected for 0 seconds
-
-This is good.
-It shows that your caster is running
-and has found its conf directory
-and the files in it,
-so it's a sign that 
-everything is knitted together properly.
-
-If your Git Bash tool supports curl,
-you can try the same from your local machine,
-connecting over the Internet.
-Start another Git Bash
-window.
-Don't connect it to your VPS, just run this command,
-which will run locally and connect to your VPS across the Internet:
-
-    curl http://my.domain.name:2101/
-
-(substituting your domain name)
-
-It should produce the same result.
-if not,
-the obvious explanation is that
-port 2101 on your VPS
-is not open for tcp requests.
-
-You could try the same test by typing that request URL
-into the address bar of your web browser,
-but they are beginning to support https only,
-and this request is http, so it may not work.
-
-Now you can shut down the server.  First you must find the ID of the running container,
-as described above (in the section on the log file).
-
-To avoid confusion:  to start the server use docker run and specify the image ID.
-Once it's running, refer to it using its container ID, not its image ID.
+```
+docker kill {container_id}
+```
 
 When the container stops,
 the Linux image that was running
@@ -1057,31 +971,29 @@ removing old image files and containers.
 Again, you need to read the manual,
 
 Whenever you change anything in the project, you need to run the docker build again.
-That will produce a new image with a different ID.
+That will produce a new image.
 
 When you started the docker image earlier,
 it tied up your git bash window.
 To avoid that, start the image using this magic:
 
-    sudo docker run {image_id} >/dev/null 2>&1 &
+    docker run ntripserver >/dev/null 2>&1 &
 
-(substituting your image ID)
-
-">/dev/null" connects the command's standard output to a special file that just discards anything
+">/dev/null" connects the command's standard output channel to a special file that just discards anything
 written to it.
+
 "2>&1" connects the standard error channel to whatever the standard output channel is connected to.
 That means that the docker image will run quietly.
+
 The "&" at the end of the command runs it in the background,
-so you get another prompt and you can issue more commands.
+so you can issue more commands.in that window.
+
 The caster will run until something goes wrong and it dies,
 or until it's shut down.
 
 If you run "docker ps" again,
 you will see that the container ID is different.
 Running a docker image creates a new container.
-
-If something goes wrong, we need to find out what happened
-by looking at the log.
 
 The docker container is a complete separate Linux environment
 and if you know its container ID you can run commands in it.
@@ -1109,47 +1021,10 @@ is a docker command that lists the running containers.
 is a linux command that lists the running programs.
 The two commands do similar jobs and one is named after the other.
 
-When we start the caster running,
-it produces a log file within the docker image.
-When it started,
-the current directory was /usr/local/ntripcaster/bin,
-so the log file is in there.
-We can see it using the ls command:
-
-    root@audolatry:/home/simon/ntripcaster# docker exec -it f473f0749fd0 ls /usr/local/ntripcaster/bin
-    
-    ntripcaster  ntripcaster.log
-
-You can track what's written to the log using the tail command.
-The -f option makes tail run forever,
-displaying new lines as they arrive:
-
-    docker exec -it 80d5bc1e5b57 tail -f /usr/local/ntripcaster/bin/ntripcaster.log
-
-    [29/Aug/2019:16:55:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:16:56:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:16:57:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:16:58:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:16:59:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:17:00:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:17:01:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:17:02:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:17:03:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-    [29/Aug/2019:17:04:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
-
-Use ctrl/c to stop the tail command.
-
-If nothing bad happens,
-the caster will run until
-the VPS is shut down.
-Your VPS supplier will shut it down occasionally.
-They should warn you if they do that,
-but you will have to start caster again
-using docker run.
-
-You can configure the VPS to run a command whenever it starts.
-Unfortunately, how to do that depends on what version of Linux you are running on your VPS.
-(Not to be confused with the version that you specified in the Dockerfile.)
+You can configure your server machine to run a command whenever it starts.
+Unfortunately, how to do that depends on what version of Linux you are running.
+(Not to be confused with the version that you specified in the Dockerfile.
+That's what runnin within the container.)
 
 I'm running Ubuntu on my VPS, and a Google search led me to https://askubuntu.com/questions/814/how-to-run-scripts-on-start-up.
 The relevent part is "The upstart system will execute all scripts from which it finds a configuration in directory /etc/init. These scripts will run during system startup (or in response to certain events, e.g., a shutdown request) and so are the place to run commands that do not interact with the user; all servers are started using this mechanism."
