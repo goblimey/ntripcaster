@@ -7,28 +7,52 @@ in English, the Federal Agency for Cartography and Geodesy.
 It's used to transmit corrections from a GNSS base station
 to a GNSS rover over the Internet.
 (GNSS is the general term for what we often call GPS.)
-Recently base stations and rovers have become much cheaper
-and you can buy a complete system for less than $1,000.
 
-Your caster softtware has to run on a server with a well-known name.
+To summarise:
+A GNSS receiver receives signals from GNSS satellites such as GPS
+and uses them to calculate its position.
+The signals are distorted by obstacles such as the ionosphere,
+which causes errors in the calculated position.
+The base station and the rover are both GNSS receivers.
+The base station is fixed in one spot
+and knows its position precisely.
+Its observations of the satellite signals can be used
+to work out the distortion of the signals and thus correct the errors.
+A rover within a few kilometres of a base station can use these corrections to calculate its position
+accurate to 2cm.
+The NTRIP protocol provides the means for the base station
+to send data to the rover via the Internet.
+It does this via an intermediate server called an NTRIP caster.
+
+This technology has been around for about twenty years,
+but it used to be expensive.
+Recently base stations, rovers and servers have become much cheaper
+and you can buy a complete system for less than $1,000.
+All you need to get it working is some free software,
+including this caster.
+
 If you have your own network of Windows machines
 and you know how to configure them,
 you may be able to get the caster working on one of those.
 Here I assume that you are going to set it up on a server on the Internet with a proper domain name.
 Nowadays, that's fairly cheap,
 and it's one less machine to manage.
-(I use a Digital Ocean droplet that costs me $5 per month.)
+Your caster must run on a server machine with a publshed IP address.
+I run mine on a Digital Ocean Droplet costing $5 per month.
+(Other providers of virtual private servers are available.)
 
-BKG's caster implements NTRIP Version 1.
-It's free and open source.
+BKG's caster softare is free and open source.
+It implements NTRIP Version 1.
 NTRIP is now at Version 2.
-BKG has a version 2 caster, but it's not free or open source.
+BKG offers a version 2 caster, but it's not free or open source.
+If you are going to use the free caster,
+you need to check that your rover can use a Version 1 service.
 
 Docker provides a ready-made predictable environment in which you can build and run software.
 The steps to build and run a docker application are the same regardless of your operating system.
 
 Until docker came along,
-installing software like this could be a nightmarish mess,
+installing software like this caster could be a nightmarish mess,
 because the environment provided by every computer was
 different and unpredictable - Windows 7, Windows 10, Ubuntu Linux, Red hat Linux
 or whatever,
@@ -46,6 +70,10 @@ Two applications can only communicate through well understood interfaces.
 This does mean that to put a solution together you may have to learn a few new skills,
 which is a cost,
 but most people find that the benefits of using docker far outweigh this.
+In particular,
+you need to understand how to use a UNIX command windows.
+You can learn the basics of that using my
+[dockerised learn package](https://github.com/goblimey/learn-unix).
 
 This document explains what NTRIP is,
 how to set up a suitable environment
@@ -61,19 +89,21 @@ read on.
 
 ## Configuration Files
 
+Once you've downloaded the caster
+(see how below)
+and before you install it,
+you need to set up a couple of configuration files.
+They are called sourcetable.dat and ntripcaster.conf.
+The distribution includes an example of each file.
+
 BKG's original build and installation instructions are
 [here](https://github.com/goblimey/ntripcaster/blob/master/ntripcaster/README.txt)
 They include some manual steps,
 to be followed once the software is built.
 Docker uses completely automated builds,
-so I've reworked things to allow this.
-With this version of the caster,
+so I've reworked the process so that
 you start by producing a couple of configuration files
 and the rest of the process is automatic.
-
-You just need to set up
-two configuration files called sourcetable.dat and ntripcaster.conf.
-The distribution includes an example of each file.
 
 There's a copy of BKG's documentation
 [here](https://github.com/goblimey/ntripcaster/blob/master/ntripcaster/conf/NtripSourcetable.doc).
@@ -91,13 +121,8 @@ the server limits and the access control."
 
 ### sourcetable.dat
 
-Copy the example file:
-
-```
-$ cp sourcetable.dat.dist sourcetable.dat
-```
-
-and edit sourcetable.dat to suit your needs.
+This file lives in the directory conf (ntripcaster/ntripcaster/conf) .
+You need to edit it to suit your needs.
 
 BKG's instructions say:
 "Whatever the content of your "sourcetable.dat" finally might be,
@@ -116,7 +141,8 @@ It's on the roof of my shed
 in Leatherhead in the UK.
 I call my mountpoint "uk_leatherhead".
 
-Each line of sourcetable.dat is a list of fields separate by semicolons.  Mine looks like this:
+Each line of sourcetable.dat is a list of fields separate by semicolons.
+Mine looks like this:
 
 ```
 CAS;rtcm-ntrip.org;2101;NtripInfoCaster;BKG;0;DEU;50.12;8.69;http://www.rtcm-ntrip.org/home
@@ -129,39 +155,39 @@ Field 2 "uk_leatherhead" is the name of my mountpoint.
 
 Field 3 "Leatherhead" is the nearest town to my base station.
 
+RTCM 3.0 means that the NTRIP connection is carrying RTCM version 3 messages,
+which is what my base station produces.
+
 GBR is the three-letter code for the UK.
 You can find the two and three letter code for your country
 [here](https://www.iban.com/country-codes).
 
 "51.29;-0.32" gives the longitude and latitude of my base station.
-If you don't know that,
+If you don't have that information,
 you can use "0.00;0.00".
 
 ### ntripcaster.conf
 
-Copy the example file:
+This files also lives in the directory conf (ntripcaster/ntripcaster/conf).
+You need to edit it to suit your needs.
 
-```
-$cp ntripcaster.conf.dist ntripcaster.conf
-```
-
-and edit ntripcaster.conf to suit your needs.
-The other file defines all sorts of things,
+The file defines all sorts of things,
 including the user names and password used to access the mountpoints.
 
-There's a password for the base stations.
 All base stations use the same password.
-There's no facility to specify a user name,
-so your base station can use any user name.
+There's no facility to specify a user name.
+(My base station software insists on supplying one,
+but for this caster ignores it,
+so it doesn't matter what user name I use.)
 
-There is a separate set of usernames and passords for each mountpoint
-which the rovers need to supply when they connect.
+There is a set of usernames and passords for each mountpoint
+which a rover needs to supply when it connects.
 
 The lines you need to change are scattered through the file:
 
 ```
 rp_email casteradmin@ifag.de       # substitute your email address
-server_url http://caster.ifag.de   # substitute http://your.domain.name
+server_url http://caster.ifag.de   # substitute your domain name
 ```
 
 ```
@@ -169,36 +195,38 @@ encoder_password sesam01           # Password for base stations.  Choose somethi
 ```
 
 ```
-server_name igs.ifag.de             # substitute your.domain.name
+server_name igs.ifag.de             # substitute your domain name
 
 ```
   
-The last few lines of the file specify the user names and passwords.
-You need one line for each of the mountpoints you specified in sourcetable.dat. 
-The rovers use these to access the mountpoints.
+The last few lines of the file specify the user names and passwords
+for the rovers.
+You need one line for each of the mountpoints you specified in sourcetable.dat.
+In this file, the mountpoint names must start with "/"
+(but not in sourcetable.dat).
 For example:
 
 ```
 /uk_leatherhead:user1:password1,user2:password2
 ```
-creates user names "user1" and "user2" whic a rover can use to connect to that mountpoint.
+creates user names "user1" and "user2" which a rover can use to connect to that mountpoint.
 
-In this file, the mountpoint names must start with "/"
-(but not in sourcetable.dat).
-
-You don't need to create usernames and passwords:
+You can create a public mountpoint with no user name or password.
+Any rover can connect to that mountpoint:
 
 ```
 /uk_leatherhead
 ```
-creates a public mountpoint - any rover can connect to it.
 
 The mountpoint names are case sensitive -
 "MY_MOUNTPOINT", "My_Mountpoint" and "my_mountpoint" are all different names.
+When you configure your rover,
+the case has to match.
+
 
 ## Quick Instructions For Building and Running the Caster
 
-These instructions are for those readers
+These instructions are for readers
 who are familiar with concepts such as docker,
 remote management of computers,
 domain names, virtual private servers and so on.
@@ -206,19 +234,35 @@ If you are not one of those people,
 continue to the next section.
 
 The caster must run on a server machine with a publshed IP address.
-I run mine on a Digital Ocean Droplet that costs $5 per month.
-Other providers of virtual private servers are available.
+(I run mine on a Digital Ocean Droplet.)
 The server must have an Internet domain name,
 so you need to buy one of those and assign it to your server.
-(If you don't understand any of that,
+(If you don't understand all of that,
 read the more detailed explanation below.)
+When your configure your caster
+you have to put the same name in your
+configuration file.
 
-Log int to you server via a command window and
+I'm going to assume that you control your server
+via a sudo user rather than logging in as root,
+so I'm going to use the sudo command wherever necessary.
+
+Log in to your server via a command window and
 install git and docker:
 
 ```
 sudo apt update
 sudo apt install git docker.io
+```
+
+Installing docker ceates a UNIX group called "docker".
+You need your user to be in that group to run the docker commands.
+So, add your control user to the docker group.
+(Your control user is the one you have logged in as.
+Here it's the user "gps".)
+
+```
+sudo usermod -aG docker gps
 ```
 
 Download the caster:
@@ -227,7 +271,7 @@ Download the caster:
 git clone git://github.com/goblimey/ntripcaster.git
 ```
 
-That creates a directory ntripcaster.
+That creates a directory called ntripcaster.
 Inside that is another directory with the same name
 plus a couple of other files.
 Inside the lower ntripcaster directory
@@ -240,13 +284,13 @@ cp ntripcaster.conf.dist ntripcaster.conf
 cp sourcetable.dat.dist sourcetable.dat
 ```
 
-Edit your configuration files as explained above.
+Edit your configuration files sourcetable.dat and ntripcaster.conf as explained above.
 
 Move back to the top level of the project and build your docker image:
 
 ```
 cd ../..
-sudo docker build . -t ntripcaster
+docker build . -t ntripcaster
 ```
 
 The build will take a little while and at the end you should see something like this:
@@ -262,7 +306,7 @@ Successfully tagged ntripcaster:latest
 Run it like so:
 
 ```
-sudo docker run -p2101:2101 ntripcaster >/dev/null 2>&1 &
+docker run -p2101:2101 ntripcaster >/dev/null 2>&1 &
 ```
 The caster runs on port 2101.
 The -p option publishes that port and makes it available to the outside world
@@ -283,29 +327,32 @@ or until it's forcibly shut down.
 To view the running caster:
 
 ```
-sudo docker ps
+docker ps
 ```
 That produces a list of running docker containers, something like this:
 ```
-CONTAINER ID  IMAGE        COMMAND                 CREATED             STATUS              PORTS                    NAMES
-fb90a0a44e14  ntripcaster  "/bin/sh -c /usr/loc…"  16 minutes ago      Up 16 minutes       0.0.0.0:2101->2101/tcp   great_sammet
+CONTAINER ID  IMAGE        COMMAND                 CREATED        STATUS        PORTS                  NAMES
+fb90a0a44e14  ntripcaster  "/bin/sh -c /usr/loc…"  16 minutes ago Up 16 minutes 0.0.0.0:2101->2101/tcp great_sammet
 ```
-So docker is running one container, the caster. Its container ID is fb90a0a44e14.
-You need that ID for various control purposes.
+So docker is running one container.
+Its container ID is fb90a0a44e14.
+
+The container is running the image ntripcaster which we cteated earlier.
+
+You need that container ID for various control purposes.
 
 For a quick check that the caster is working,
-use curl to fetch the home page:
+if you have curl installed,
+you can use it to fetch the caster's home page:
 
     curl --http0.9 http://goblimey.com:2101/
 
 (That's http, NOT https.)
 
 That request should produce a copy of the source table.
-This tests that the caster is running and that it has found its configuration files.
+This shows that the caster is running and that it's found its configuration files.
 
-If that works,
-and you have curl installed,
-you can run a similar test from your local computer
+You can run a similar test from your local computer
 to check that it works across the Internet:
 
     curl http://my.domain.name:2101/
@@ -323,11 +370,11 @@ and it doesn't seem to like http requests anymore.)
 
 The caster will run until you stop it or reboot the server machine.
 
-To stop the container you need to find its container ID as shown earlier.
+To stop the container you need to find its container ID using docker ps as shown earlier.
 Given that, stop it like so:
 
 ```
-docker kill {container_id}#
+docker kill {container_id}
 ```
 
 For example:
@@ -335,7 +382,6 @@ For example:
 ```
 docker kill fb90a0a44e14
 ```
-
 
 ### The Log File
 
@@ -345,7 +391,7 @@ To see the log have to know the ID of the container:
 
  fb90a0a44e14.
 
-BKG's original installation instructions sare slightly misleading.
+BKG's original installation instructions are slightly misleading.
 they say
 that to run the caster you should change directory to
 /usr/local/ntripcaster/bin
@@ -394,6 +440,7 @@ Use ctrl/c to stop the tail command.
 
 
 ## NTRIP Basics
+
 There are a lot of acronyms in this field.
 I'll start by unpicking some of them.
 
