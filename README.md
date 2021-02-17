@@ -483,8 +483,8 @@ typically within half a metre.
 ### RTCM
 
 The Radio Technical Commission for Maritime Services (RTCM) produced a standard
-protocol for the corrections over a radio link.
-so a base station from one manufacturer can send corrections
+protocol for sending satellite observation data over a radio link.
+so a base station from one manufacturer can send observations
 to a rover from another manufactuer.
 This is called the RTCM protocol.
 It's currently at version 3.
@@ -493,7 +493,8 @@ RTCM over radio is used for all sorts of purposes
 including the control of drones.
 The drone contains a GNSS rover which sends position information to its flight controller.
 The base station sits on the ground in a fixed position,
-sending GNSS data to the rover.
+sending GNSS data to the rover,
+which it uses to find its position more accurately.
 The two are connected via Long Range (LoRa) radio,
 which works over a few kilometres.
 The operator can pre-program the drone to follow a path
@@ -546,7 +547,7 @@ My base station is in my garden shed with its antenna on the roof.
 It's essentially a special bit of circuitry bought off the shelf,
 connected to a Raspbery Pi running some free software,
 which you can also find in 
-(another of my repositories)[https://github.com/goblimey/c-ntripserver].
+[another of my repositories](https://github.com/goblimey/c-ntripserver).
 Total cost, about $700.
 
 This caster software runs
@@ -586,7 +587,7 @@ if the base station's notion of its position
 is half a metre to the North of where it really is,
 your whole map will be shifted by half a metre to the North.
 
-That just leaves the small problem of figuring out the position of the base station accurately.
+So getting everything to work properly mainly involves figuring out the position of the base station accurately.
 
 
 ## Getting a Domain and Server
@@ -797,7 +798,7 @@ otherwise you could lock yourself out as well as the hackers.
 
 That's the security sermon over.  Now let's build an NTRIP caster.
 
-## Installing the Caster
+## More on Installing the Caster
 
 There's a user called root that has special privileges.
 You need them to install things.
@@ -812,30 +813,33 @@ Having to start each dangerous command with "sudo" is a reminder to be careful.
 Using docker makes things even safer,
 because it automates all of the dangerous operations. 
 
-You can also add the sudo if you are logged in as
-the root user, but it's not ncssary.
-It only wastes time,
-it doesn't do any harm.
-I'm going to add sudo to all commands that need it,
-and you can just copy and paste them into your git bash window.
+You don't need to add "sudo" to the start of each command
+if you are logged in as
+the root user, because you already have the right privileges,
+but it does no harm.
+So you can copy and paste shown earlier
+into your git bash window
+whichever
+user you are logged in as,
+for example:
 
-(Concerning pasting,
-you can't use the usual Windows shortcut ctrl/v to paste into the ssh window.
+```
+sudo apt install docker.io
+```
+
+Concerning pasting,
+you can't use the usual Windows shortcut ctrl/v to paste
+within the ssh window.
 Right click and a small menu appears with a paste option.)
-
-Run the commands shown earlier, starting with:
-
-    sudo apt install docker.io
-    
-
 
 To fetch the caster project, you did this:
 
     git clone git://github.com/goblimey/ntripcaster.git
 
-That creates a directory called ntripcaster
+which created a directory called ntripcaster
 
-If you are not familiar with Linux, use the editor nano to edit the configuration files, for example:
+Then you need to edit your configuration files.
+If you are not familiar with Linux, use the editor nano, for example:
 
     nano sourcetable.dat
 
@@ -874,7 +878,7 @@ CMD /usr/local/ntripcaster/bin/ntripcaster
 
 The directives in the Dockerfile
 automate a build and deploy process which is similar to the steps described by
-BKG's original installation instructions shown above.
+BKG's original installation instructions.
 Tit runs in two stages.
 The first stage installs the software needed to build the executable program,
 and then builds it.
@@ -929,12 +933,11 @@ means "the current directory".
 Docker looks in the given directory for a file called Dockerfile
 and obeys the directives in it. 
 
-Run the image like so:
+You can run the image like so:
 
     docker run -p2101:2101 ntripcaster
 
 The -p connects port 2101 of the docker image to port 2101 of the mchine on which you are running.
- 
  
 The "docker run" ties up your git bash window.
 You can start another and use ssh to connect to your server machine as before.
