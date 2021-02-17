@@ -15,7 +15,7 @@ The signals are distorted by obstacles such as the ionosphere,
 which causes errors in the calculated position.
 The base station and the rover are both GNSS receivers.
 The base station is fixed in one spot
-and knows its position precisely.
+and knows its position very precisely.
 Its observations of the satellite signals can be used
 to work out the distortion of the signals and thus correct the errors.
 A rover within a few kilometres of a base station can use these corrections to calculate its position
@@ -31,22 +31,28 @@ and you can buy a complete system for less than $1,000.
 All you need to get it working is some free software,
 including this caster.
 
+I should also say at the beginning that
+you don't necessarily need your own NTRIP caster.
+There are a number already available.
+Use your favourite seach engine to find them.
+
 If you have your own network of Windows machines
 and you know how to configure them,
 you may be able to get the caster working on one of those.
 Here I assume that you are going to set it up on a server on the Internet with a proper domain name.
 Nowadays, that's fairly cheap,
 and it's one less machine to manage.
-Your caster must run on a server machine with a publshed IP address.
+Your caster must run on a server machine on the public Internet
+with a published domain name.
 I run mine on a Digital Ocean Droplet costing $5 per month.
 (Other providers of virtual private servers are available.)
 
-BKG's caster softare is free and open source.
+BKG's caster software is free and open source.
 It implements NTRIP Version 1.
 NTRIP is now at Version 2.
 BKG offers a version 2 caster, but it's not free or open source.
 If you are going to use the free caster,
-you need to check that your rover can use a Version 1 service.
+you need to check that your base station and rover can use a Version 1 service.
 
 Docker provides a ready-made predictable environment in which you can build and run software.
 The steps to build and run a docker application are the same regardless of your operating system.
@@ -54,7 +60,7 @@ The steps to build and run a docker application are the same regardless of your 
 Until docker came along,
 installing software like this caster could be a nightmarish mess,
 because the environment provided by every computer was
-different and unpredictable - Windows 7, Windows 10, Ubuntu Linux, Red hat Linux
+different and unpredictable - Windows 7, Windows 10, Ubuntu Linux, Red Hat Linux
 or whatever,
 and usually with different optional software installed.
 
@@ -71,7 +77,7 @@ This does mean that to put a solution together you may have to learn a few new s
 which is a cost,
 but most people find that the benefits of using docker far outweigh this.
 In particular,
-you need to understand how to use a UNIX command windows.
+you need to understand how to use a UNIX command window.
 You can learn the basics of that using my
 [dockerised learn package](https://github.com/goblimey/learn-unix).
 
@@ -79,10 +85,6 @@ This document explains what NTRIP is,
 how to set up a suitable environment
 for your caster,
 how to build and run it and how to manage it once it's running.
-
-I should also say at the beginning that
-you don't necessarily need your own NTRIP caster.
-There are a number already available that you might use instead.
 
 If you do need to run your own caster,
 read on.
@@ -168,11 +170,11 @@ you can use "0.00;0.00".
 
 ### ntripcaster.conf
 
-This files also lives in the directory conf (ntripcaster/ntripcaster/conf).
+This file also lives in the directory conf (ntripcaster/ntripcaster/conf).
 You need to edit it to suit your needs.
 
 The file defines all sorts of things,
-including the user names and password used to access the mountpoints.
+including the user names and password used to access the system.
 
 All base stations use the same password.
 There's no facility to specify a user name.
@@ -233,7 +235,7 @@ domain names, virtual private servers and so on.
 If you are not one of those people,
 continue to the next section.
 
-The caster must run on a server machine with a publshed IP address.
+The caster must run on a server machine on the public Internet.
 (I run mine on a Digital Ocean Droplet.)
 The server must have an Internet domain name,
 so you need to buy one of those and assign it to your server.
@@ -256,10 +258,10 @@ sudo apt install git docker.io
 ```
 
 Installing docker ceates a UNIX group called "docker".
-You need your user to be in that group to run the docker commands.
-So, add your control user to the docker group.
-(Your control user is the one you have logged in as.
-Here it's the user "gps".)
+To run the docker command,
+you need your user (the one you are logged in as on the server)
+to be in that group.
+In this example, the user is called "gps":
 
 ```
 sudo usermod -aG docker gps
@@ -311,14 +313,18 @@ Removing intermediate container a13e5bbd3545
 Successfully built fc4f331c1db4
 Successfully tagged ntripcaster:latest
 ```
-Run it like so:
+
+### Running the Caster
+
+Onc you've built the caster, run it like so:
 
 ```
 docker run -p2101:2101 ntripcaster >/dev/null 2>&1 &
 ```
 The caster runs on port 2101.
-The -p option publishes that port and makes it available to the outside world
-on the same port of the VPS.
+The -p option publishes that port,
+which makes it available to the outside world.
+In this case, it's accesible via port 2101.
 
 ">/dev/null" connects the docker command's standard output channel to a special file that just discards anything
 written to it.
@@ -345,34 +351,33 @@ fb90a0a44e14  ntripcaster  "/bin/sh -c /usr/loc…"  16 minutes ago Up 16 minute
 So docker is running one container.
 Its container ID is fb90a0a44e14.
 
-The container is running the image ntripcaster which we cteated earlier.
+The container is running the image ntripcaster which we built earlier.
 
-You need that container ID for various control purposes.
+You need to know that container ID for various control purposes, as we wil see later.
 
 For a quick check that the caster is working,
-if you have curl installed,
+if you have curl installed on your server,
 you can use it to fetch the caster's home page:
 
-    curl --http0.9 http://goblimey.com:2101/
+    curl --http0.9 http://localhost:2101/
 
 (That's http, NOT https.)
 
 That request should produce a copy of the source table.
 This shows that the caster is running and that it's found its configuration files.
 
-You can run a similar test from your local computer
-to check that it works across the Internet:
+Back on your local computer,
+if it's got curl installed
+you can run a similar test
+to check that things are working across the Internet:
 
     curl http://my.domain.name:2101/
 
-That should produce the same result.
+That should produce the same result as before.
 If the first test worked and this one doesn't,
 the most likely explanation is that you haven't arranged with your VPS provider
 to open up port 2101 to tcp traffic.
 
-(You could try the same test with a web browser,
-but modern versions of chrome have gone all https
-and it doesn't seem to like http requests anymore.)
 
 ### Stopping the Caster
 
@@ -391,15 +396,20 @@ For example:
 docker kill fb90a0a44e14
 ```
 
+Start the caster again as before:
+
+```
+docker run -p2101:2101 ntripcaster >/dev/null 2>&1 &
+```
+
 ### The Log File
 
 The caster creates a log file as it runs,
 which you can use to debug problems.
-To see the log have to know the ID of the container:
+To see the log you have to know the ID of the container,
+in this example "fb90a0a44e14".
 
- fb90a0a44e14.
-
-BKG's original installation instructions are slightly misleading.
+(By the way, BKG's original installation instructions are slightly misleading.
 they say
 that to run the caster you should change directory to
 /usr/local/ntripcaster/bin
@@ -407,25 +417,18 @@ and run the program from there.
 It will then pick up the configuration files from
 /usr/local/ntripcaster/conf and write a log file
 in /usr/local/ntripcaster/logs.
-
 Not quite.
 When the server starts up it creates a log file in the current drectory,
-so the docker image moves to /usr/local/ntripcaster/logs
+whatever that is.
+So the docker image changes directory to /usr/local/ntripcaster/logs
 and runs the caster software from there,
-so the log ends up in the right place:
-
-```
-docker exec -it {container_id} ls /usr/local/ntripcaster/logs
-
-ntripserver.log
-```
-
+and the log ends up in the right place.)
 
 You can track what's written to the log using the tail command.
 The -f option makes tail run forever,
 displaying new lines as they arrive:
 
-    docker exec -it {container_id} tail -f /usr/local/ntripcaster/logs/ntripcaster.log
+    docker exec -it fb90a0a44e14 tail -f /usr/local/ntripcaster/logs/ntripcaster.log
 
     [29/Aug/2019:16:55:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
     [29/Aug/2019:16:56:26] [1:Calendar Thread] Bandwidth:0.000000KB/s Sources:0 Clients:0
@@ -477,31 +480,7 @@ two signals coming from the same satellite on different frequencies
 to get an even more acurate position -
 typically within half a metre.
 
-Apart from using GNSS to find the base station's position,
-you can use traditional surveying techniques
-and then simply tell the base station its position.
-
-A base station that knows its position accurately,
-it
-can send corrections to a nearby rover.
-Essentially the base station says "I know I'm here.
-The signal from satellite X says that I'm there,
-so it's wrong by this much."
-It sends out a stream of correction messages for each satellite that it can see.
-If the rover is close enough and can see the same satellites,
-it can use these data to correct the signals that it's receiving
-and get a better fix.
-If the rover is within about 10 Km of the base station
-and the base station knows its position perfectly,
-the rover can find its position within 2 cm.
-
-If the base station's notion of its position is slightly wrong,
-the rover's position will be wrong by the same amount.
-Imagine you move the rover around a site,
-measure the positions of various features and draw a map.
-Each position on the map will always be inaccurate by about 2 cm.
-Also, if the base station's notion of its position is half a metre to the North of where it really is,
-the whole map will be shifted by half a metre to the North.
+### RTCM
 
 The Radio Technical Commission for Maritime Services (RTCM) produced a standard
 protocol for the corrections over a radio link.
@@ -511,86 +490,104 @@ This is called the RTCM protocol.
 It's currently at version 3.
 
 RTCM over radio is used for all sorts of purposes
-including small drones.
-The drone contains a GNSS rover sending position information to its flight controller.
+including the control of drones.
+The drone contains a GNSS rover which sends position information to its flight controller.
 The base station sits on the ground in a fixed position,
-sending GNSS corrections to the rover.
-The two are connected via Long Range (LoRa) radio.
+sending GNSS data to the rover.
+The two are connected via Long Range (LoRa) radio,
+which works over a few kilometres.
 The operator can pre-program the drone to follow a path
 around a site,
 avoiding obstacles.
-This works well when the base station is in a prominent position
+
+This setup probably works well when the base station is in a prominent position
 and the rover is high in the air,
 so the two have line of site between them.
-
 If the rover is closer to the ground,
 for example in a hand-held tracker,
-feature such as buildings, trees and hedges can interfere
+obstacles such as buildings, trees and hedges can interfere
 with the radio connection and make it very flaky.
-To provide a better alternative,
+
+### NTRIP
+
+To provide a better alternative to RTCM over a radio link,
 the Bundesamt für Kartographieund Geodäsie (BKG) defined
 the Network Transport of Rtcm via Internet Protocol (NTRIP)
 which replaces the radio link with an HTTP connection over the Internet.
 
-You can buy a base station off the shelf that sends corrections using NTRIP,
-and a rover that can receive and use them.
-Recently,
-the base stations have become much cheaper,
-and you can buy a complete system for less than $1,000.
-It's also much easier than it used to be to get an Internet connection -
-any smart phone can provide one.
-The smart phone can also provide a display
-for the rover,
-reducing the cost.
+This requires the base station and the rover to be connected to the Internet
+and to be able to communicate with each other.
+To achieve that, one of the devices involved must have a published Internet location,
+ie a fixed IP address and a domain name.
+That's the purpose of the caster.
+A caster takes NTRIP traffic from one or more base stations
+and routes it to one or more rovers.
+Having the intermediate caster means that
+neither the base station nor the rover need any fancy kind of Internet connection. 
 
-For a device to find a target device
-on the Internet,
-the target needs a well-known address.
-To avoid every base station
-needing one of those, NTRIP uses three components,
-a caster, a server and a client.
+This allows a complete system to be built for less than $1,000.
 
-The caster broadcasts the data coming from one or more base stations.
-Each base station is represented in the caster by a mountpoint.
-All other components communicate via the caster,
-so only it needs a well-known address. 
-
-Each base station sends a series of HTTP requests to the caster,
-containing correction data in RTCM messages.
-
-The software to do this is called an NTRIP server.
-Crucially, it doesn't need a well-known Internet address.
-My base base station is currently in a shed in my back garden,
-connecting to a caster via my home broadband service.
-
-A client (a rover) sends a series of HTTP requests
-to the caster
-and gets back corrections from a mountpoint (a base station) in response.
-Since it matters how far apart the base station and rover are,
-the protocol includes a facility for the rover to find its nearest mountpoint.
-
-To use NTRIP,
-the rover must be connected to the Internet.
-While I was working on this project
-I did my testing using
-an Emlid Reach M+ as a hand-held rover,
-connected to my iPad over Bluetooth
-and using its Internet connection.
-The Reach is designed to work within a drone.
+The rover is typically connected to the mobile (cell phone) Internet,
+perhaps using an Internet modem
+or connected by WiFi to a mobile phone.
+It won't have a published domain name and its IP address
+will change very frequently.
+My rover is an Emlid M+
+connected to my iPad over WiFi
+to get an Internet connection.
+The Reach costs about $300 including antenna.
+It's designed to work within a drone.
 As a hand-held rover
 it's a bit of a lashup,
-and I don't recommend it,
-but technically it worked quite well.
+but it works quite well.
 
-For more professional applications such as surveying,
-companies such as Trimble and Leica
-sell hand-held GNSS devices that
-can receive corrections from an NTRIP caster.
-Obviously they would like you to use their correction service,
-but you don't have to.
-Trimble recently launched a budget product called the [Catalyst](https://geospatial.trimble.com/catalyst),
-which competes on price with my Reach device
-and looks much nicer.  
+The base station can connect to the Internet using a conventional home broadband system.
+My base station is in my garden shed with its antenna on the roof.
+It's essentially a special bit of circuitry bought off the shelf,
+connected to a Raspbery Pi running some free software,
+which you can also find in 
+(another of my repositories)[https://github.com/goblimey/c-ntripserver].
+Total cost, about $700.
+
+This caster software runs
+on a virtual private server
+in one of Digital Ocean's data centres,
+which costs me $5 per month, plus $13 per year for the domain name.
+
+This is how it all works:
+
+The base station
+sends data encoded in NTRIP format to a nearby rover via a caster.
+It sends its position and its recent readings ("observations")
+of signals from the satellites that it can see.
+Knowing the base station's position,
+it's possible to work out what the signals ought to look like,
+and therefore what errors the distortion has introduced.
+If the moving rover is close to the base station,
+it sees the same satellites and suffers the same distortions,
+so it can use the base station's observations to correct the errors in its own observations.
+
+If the rover is within about 10 Km of the base station
+and the base station knows its position perfectly,
+the rover can find its position within 2 cm.
+Up to 20 Kilometres away
+it can produce 4 cm accuracy,
+and so on.
+
+All this assumes that base station knows its position very accurately.
+If its notion of its position is wrong,
+the rover's calculated position will be wrong by the same amount.
+Imagine you have rover close to a base station and
+and you move it around a site,
+measuring the positions of various features and draw a map.
+Each position on the map should be accurate to 2 cm.
+However,
+if the base station's notion of its position
+is half a metre to the North of where it really is,
+your whole map will be shifted by half a metre to the North.
+
+That just leaves the small problem of figuring out the position of the base station accurately.
+
 
 ## Getting a Domain and Server
 To run the caster, you need a server with a well-known name.
@@ -604,7 +601,7 @@ You can obtain a domain from various domain registrars such as
 or [ionos](https://www.ionos.co.uk/domains/domain-names?ac=OM.UK.UKo42K356180T7073a&gclid=CjwKCAjwzJjrBRBvEiwA867byhd5ynLOIbN-A4a2-9cpfmQS4pAvJj4gE6oRjs_5HSW2STzu9oYgiBoCUFUQAvD_BwE&gclsrc=aw.ds).
 There are many others.
 I mention those two
-because their initial registration fees and their subsequent
+because I know that their initial registration fees and their subsequent
 renewal fees are both reasonable.
 When choosing a registrar,
 always check the renewal fees.
@@ -623,17 +620,11 @@ but they can be expensive.
 [Digital Ocean](https://www.digitalocean.com/)
 offer a VPS called a droplet that you can rent for $5 per month.
 In the UK,
-[Mythic Beasts](https://www.mythic-beasts.com/servers/virtual) offer a configurable VPS,
-so you can choose how much processor power it has and how much it costs.
-The more powerful your VPS,
-the more you pay,
-but you don't need much computer power to run an NTRIP caster.
-The main issue is network bandwidth.
-Messages pass between your base station
-and your caster
-and between your
-rover and your caster.
-You need enough bandwidth to handle that traffic.  
+[Mythic Beasts](https://www.mythic-beasts.com/servers/virtual) offer a 
+VPS for a comparable price.
+
+You don't need much computer power or network bandwidth to run an NTRIP caster,
+which is why you can use these cheap servers.
 
 When you rent the VPS you can choose what
 operating system it runs.
@@ -645,10 +636,9 @@ Once you've hired your domain and your VPS,
 you need to configure the VPS
 to answer to the domain name.
 How to do that varies according to the two suppliers.
-Your VPS supplier's tech support people should be able to explain how to do it.
-
-(That's another reason for using one of the better-known domain registrars such as ionos or namecheap.
-The techies at the VPS company should know what to do.)
+Your VPS supplier's tech support people should be able to explain how to do it,
+particilarly if you rent your domain from
+one of the better-known domain registrars such as Ionos or namecheap.
 
 Each network service on a computer runs on a numbered port,
 for example, a web server will usually run its http service on port 80
@@ -661,6 +651,7 @@ You have to ensure that port 2101 is open for tcp access.
 You may need to ask the tech support people how to do this. 
 
 ## Connecting to Your VPS
+
 Once your VPS is set up and
 responding to your domain name,
 you need to connect to it
