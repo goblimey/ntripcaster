@@ -194,12 +194,13 @@ void source_login(connection_t *con, char *expr)
 			source->source_agent = my_strdup(arg);
 		}
 	} while ((go_on > 0) && connected);
-	
-	if (!source->source_agent || strncasecmp(source->source_agent, "ntrip", 5) != 0) {
-		sock_write_line (con->sock, "Not authorized (no NTRIP source)\r\n");
-		kick_connection (con, "No NTRIP source");
-		return;
-	}
+
+	// commented out to support Reach which does not send agent
+	// if (!source->source_agent || strncasecmp(source->source_agent, "ntrip", 5) != 0) {
+	// 	sock_write_line (con->sock, "Not authorized (no NTRIP source)\r\n");
+	// 	kick_connection (con, "No NTRIP source");
+	// 	return;
+	// }
 
 	if (connected) {
 
