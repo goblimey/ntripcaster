@@ -278,7 +278,7 @@ sudo systemctl enable docker
 Download the caster:
 
 ```
-git clone git://github.com/goblimey/ntripcaster.git
+git clone https://github.com/goblimey/ntripcaster.git
 ```
 
 That creates a directory called ntripcaster.
