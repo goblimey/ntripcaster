@@ -363,6 +363,327 @@ client_errors (const client_t *client)
 	return (CHUNKLEN - (client->cid - client->source->cid)) % CHUNKLEN;
 }
 
+/* Check if the user agent indicates a web browser */
+static int is_browser(const char *user_agent) {
+	if (!user_agent || ice_strcmp(user_agent, "(null)") == 0)
+		return 0;
+	
+	/* Check for common browser user agent strings */
+	if (ice_strcasestr(user_agent, "Mozilla") ||
+		ice_strcasestr(user_agent, "Chrome") ||
+		ice_strcasestr(user_agent, "Safari") ||
+		ice_strcasestr(user_agent, "Firefox") ||
+		ice_strcasestr(user_agent, "Edge") ||
+		ice_strcasestr(user_agent, "Opera") ||
+		ice_strcasestr(user_agent, "Internet Explorer") ||
+		ice_strcasestr(user_agent, "MSIE")) {
+		return 1;
+	}
+	
+	return 0;
+}
+
+/* Send HTML formatted sourcetable for browsers */
+static void send_html_sourcetable(connection_t *con, FILE *ifp) {
+	char szBuffer[2000], c[2];
+	int nBytes = 1, nBufferBytes = 0;
+	char *time;
+	
+	time = get_log_time();
+	
+	/* Send HTTP header for HTML */
+	sock_write_line (con->sock, "HTTP/1.0 200 OK");
+	sock_write_line (con->sock, "Server: NTRIP NtripCaster %s/%s", info.version, info.ntrip_version);
+	sock_write_line (con->sock, "Content-Type: text/html");
+	sock_write_line (con->sock, "Connection: close\r\n");
+	
+	/* Send HTML header */
+	sock_write_line (con->sock, "<!DOCTYPE html>");
+	sock_write_line (con->sock, "<html>");
+	sock_write_line (con->sock, "<head>");
+	sock_write_line (con->sock, "<title>NTRIP Caster - Source Table</title>");
+	sock_write_line (con->sock, "<style>");
+	sock_write_line (con->sock, "body { font-family: Arial, sans-serif; margin: 20px; }");
+	sock_write_line (con->sock, "h1, h2 { color: #333; }");
+	sock_write_line (con->sock, "table { border-collapse: collapse; width: 100%%; margin-top: 20px; margin-bottom: 30px; }");
+	sock_write_line (con->sock, "th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }");
+	sock_write_line (con->sock, "th { background-color: #f2f2f2; font-weight: bold; }");
+	sock_write_line (con->sock, "tr:nth-child(even) { background-color: #f9f9f9; }");
+	sock_write_line (con->sock, ".info { background-color: #e7f3ff; padding: 10px; border-radius: 5px; margin-bottom: 20px; }");
+	sock_write_line (con->sock, ".misc-info { background-color: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 20px; }");
+	sock_write_line (con->sock, "</style>");
+	sock_write_line (con->sock, "</head>");
+	sock_write_line (con->sock, "<body>");
+	
+	/* Server information */
+	sock_write_line (con->sock, "<div class=\"info\">");
+	sock_write_line (con->sock, "<h1>NTRIP Caster Source Table</h1>");
+	if (info.server_name)
+		sock_write_line (con->sock, "<p><strong>Server:</strong> %s</p>", info.server_name);
+	sock_write_line (con->sock, "<p><strong>Port:</strong> %d</p>", info.port[0]);
+	sock_write_line (con->sock, "<p><strong>Version:</strong> %s/%s</p>", info.version, info.ntrip_version);
+	sock_write_line (con->sock, "<p><strong>Time:</strong> %s</p>", time);
+	sock_write_line (con->sock, "</div>");
+	
+	if (ifp) {
+		/* First, display any non-STR/CAS/NET lines */
+		sock_write_line (con->sock, "<div class=\"misc-info\">");
+		sock_write_line (con->sock, "<h2>General Information</h2>");
+		while (nBytes > 0) {
+			nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			while (((unsigned int)c[0] != 10) && (nBytes > 0)) {
+				szBuffer[nBufferBytes] = c[0];
+				nBufferBytes++;
+				nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			}
+			szBuffer[nBufferBytes] = '\0';
+			
+			if (nBufferBytes > 0) {
+				/* Display non-STR/CAS/NET lines as preformatted text */
+				if (strncmp(szBuffer, "STR", 3) != 0 && strncmp(szBuffer, "CAS", 3) != 0 && strncmp(szBuffer, "NET", 3) != 0) {
+					sock_write_line (con->sock, "<pre style=\"margin: 2px 0; font-family: monospace; font-size: 12px;\">%s</pre>", szBuffer);
+				}
+			}
+			nBufferBytes = 0;
+		}
+		sock_write_line (con->sock, "</div>");
+		
+		/* CAS Table */
+		rewind(ifp);
+		nBytes = 1;
+		nBufferBytes = 0;
+		
+		sock_write_line (con->sock, "<h2>Casters (CAS)</h2>");
+		sock_write_line (con->sock, "<table>");
+		sock_write_line (con->sock, "<thead>");
+		sock_write_line (con->sock, "<tr>");
+		sock_write_line (con->sock, "<th>Type</th><th>Host</th><th>Port</th><th>Identifier</th><th>Operator</th>");
+		sock_write_line (con->sock, "<th>NMEA</th><th>Country</th><th>Latitude</th><th>Longitude</th><th>Fallback Host</th>");
+		sock_write_line (con->sock, "<th>Fallback Port</th><th>Misc</th>");
+		sock_write_line (con->sock, "</tr>");
+		sock_write_line (con->sock, "</thead>");
+		sock_write_line (con->sock, "<tbody>");
+		
+		while (nBytes > 0) {
+			nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			while (((unsigned int)c[0] != 10) && (nBytes > 0)) {
+				szBuffer[nBufferBytes] = c[0];
+				nBufferBytes++;
+				nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			}
+			szBuffer[nBufferBytes] = '\0';
+			
+			if (nBufferBytes > 0 && strncmp(szBuffer, "CAS", 3) == 0) {
+				char *tokens[30];
+				int token_count = 0;
+				char *token;
+				char line_copy[2000];
+				int i;
+				
+				strncpy(line_copy, szBuffer, sizeof(line_copy) - 1);
+				line_copy[sizeof(line_copy) - 1] = '\0';
+				
+				token = strtok(line_copy, ";");
+				while (token && token_count < 30) {
+					tokens[token_count++] = token;
+					token = strtok(NULL, ";");
+				}
+				
+				sock_write_line (con->sock, "<tr>");
+				
+				/* Display CAS fields (11 defined fields) */
+				for (i = 0; i < 11; i++) {
+					if (i < token_count && tokens[i] && strlen(tokens[i]) > 0) {
+						sock_write_line (con->sock, "<td>%s</td>", tokens[i]);
+					} else {
+						sock_write_line (con->sock, "<td>-</td>");
+					}
+				}
+				
+				/* Display misc data (everything after field 11) */
+				sock_write_line (con->sock, "<td>");
+				if (token_count > 11) {
+					for (i = 11; i < token_count; i++) {
+						if (tokens[i] && strlen(tokens[i]) > 0) {
+							sock_write_line (con->sock, "%s", tokens[i]);
+							if (i < token_count - 1) sock_write_line (con->sock, "; ");
+						}
+					}
+				} else {
+					sock_write_line (con->sock, "-");
+				}
+				sock_write_line (con->sock, "</td>");
+				
+				sock_write_line (con->sock, "</tr>");
+			}
+			nBufferBytes = 0;
+		}
+		
+		sock_write_line (con->sock, "</tbody>");
+		sock_write_line (con->sock, "</table>");
+		
+		/* NET Table */
+		rewind(ifp);
+		nBytes = 1;
+		nBufferBytes = 0;
+		
+		sock_write_line (con->sock, "<h2>Networks (NET)</h2>");
+		sock_write_line (con->sock, "<table>");
+		sock_write_line (con->sock, "<thead>");
+		sock_write_line (con->sock, "<tr>");
+		sock_write_line (con->sock, "<th>Type</th><th>Identifier</th><th>Operator</th><th>Authentication</th><th>Fee</th>");
+		sock_write_line (con->sock, "<th>Web Net</th><th>Web Str</th><th>Web Reg</th><th>Misc</th>");
+		sock_write_line (con->sock, "</tr>");
+		sock_write_line (con->sock, "</thead>");
+		sock_write_line (con->sock, "<tbody>");
+		
+		while (nBytes > 0) {
+			nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			while (((unsigned int)c[0] != 10) && (nBytes > 0)) {
+				szBuffer[nBufferBytes] = c[0];
+				nBufferBytes++;
+				nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			}
+			szBuffer[nBufferBytes] = '\0';
+			
+			if (nBufferBytes > 0 && strncmp(szBuffer, "NET", 3) == 0) {
+				char *tokens[30];
+				int token_count = 0;
+				char *token;
+				char line_copy[2000];
+				int i;
+				
+				strncpy(line_copy, szBuffer, sizeof(line_copy) - 1);
+				line_copy[sizeof(line_copy) - 1] = '\0';
+				
+				token = strtok(line_copy, ";");
+				while (token && token_count < 30) {
+					tokens[token_count++] = token;
+					token = strtok(NULL, ";");
+				}
+				
+				sock_write_line (con->sock, "<tr>");
+				
+				/* Display NET fields (8 defined fields) */
+				for (i = 0; i < 8; i++) {
+					if (i < token_count && tokens[i] && strlen(tokens[i]) > 0) {
+						sock_write_line (con->sock, "<td>%s</td>", tokens[i]);
+					} else {
+						sock_write_line (con->sock, "<td>-</td>");
+					}
+				}
+				
+				/* Display misc data (everything after field 8) */
+				sock_write_line (con->sock, "<td>");
+				if (token_count > 8) {
+					for (i = 8; i < token_count; i++) {
+						if (tokens[i] && strlen(tokens[i]) > 0) {
+							sock_write_line (con->sock, "%s", tokens[i]);
+							if (i < token_count - 1) sock_write_line (con->sock, "; ");
+						}
+					}
+				} else {
+					sock_write_line (con->sock, "-");
+				}
+				sock_write_line (con->sock, "</td>");
+				
+				sock_write_line (con->sock, "</tr>");
+			}
+			nBufferBytes = 0;
+		}
+		
+		sock_write_line (con->sock, "</tbody>");
+		sock_write_line (con->sock, "</table>");
+		
+		/* STR Table */
+		rewind(ifp);
+		nBytes = 1;
+		nBufferBytes = 0;
+		
+		sock_write_line (con->sock, "<h2>Data Streams (STR)</h2>");
+		sock_write_line (con->sock, "<table>");
+		sock_write_line (con->sock, "<thead>");
+		sock_write_line (con->sock, "<tr>");
+		sock_write_line (con->sock, "<th>Type</th><th>Mountpoint</th><th>Identifier</th><th>Format</th><th>Format Details</th>");
+		sock_write_line (con->sock, "<th>Carrier</th><th>Nav System</th><th>Network</th><th>Country</th><th>Latitude</th>");
+		sock_write_line (con->sock, "<th>Longitude</th><th>NMEA</th><th>Solution</th><th>Generator</th><th>Compr Encryp</th>");
+		sock_write_line (con->sock, "<th>Authentication</th><th>Fee</th><th>Bitrate</th><th>Misc</th>");
+		sock_write_line (con->sock, "</tr>");
+		sock_write_line (con->sock, "</thead>");
+		sock_write_line (con->sock, "<tbody>");
+		
+		while (nBytes > 0) {
+			nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			while (((unsigned int)c[0] != 10) && (nBytes > 0)) {
+				szBuffer[nBufferBytes] = c[0];
+				nBufferBytes++;
+				nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			}
+			szBuffer[nBufferBytes] = '\0';
+			
+			if (nBufferBytes > 0 && strncmp(szBuffer, "STR", 3) == 0) {
+				char *tokens[30];
+				int token_count = 0;
+				char *token;
+				char line_copy[2000];
+				int i;
+				
+				strncpy(line_copy, szBuffer, sizeof(line_copy) - 1);
+				line_copy[sizeof(line_copy) - 1] = '\0';
+				
+				token = strtok(line_copy, ";");
+				while (token && token_count < 30) {
+					tokens[token_count++] = token;
+					token = strtok(NULL, ";");
+				}
+				
+				sock_write_line (con->sock, "<tr>");
+				
+				/* Display STR fields (18 defined fields) */
+				for (i = 0; i < 18; i++) {
+					if (i < token_count && tokens[i] && strlen(tokens[i]) > 0) {
+						sock_write_line (con->sock, "<td>%s</td>", tokens[i]);
+					} else {
+						sock_write_line (con->sock, "<td>-</td>");
+					}
+				}
+				
+				/* Display misc data (everything after field 18) */
+				sock_write_line (con->sock, "<td>");
+				if (token_count > 18) {
+					for (i = 18; i < token_count; i++) {
+						if (tokens[i] && strlen(tokens[i]) > 0) {
+							sock_write_line (con->sock, "%s", tokens[i]);
+							if (i < token_count - 1) sock_write_line (con->sock, "; ");
+						}
+					}
+				} else {
+					sock_write_line (con->sock, "-");
+				}
+				sock_write_line (con->sock, "</td>");
+				
+				sock_write_line (con->sock, "</tr>");
+			}
+			nBufferBytes = 0;
+		}
+		
+		sock_write_line (con->sock, "</tbody>");
+		sock_write_line (con->sock, "</table>");
+	} else {
+		sock_write_line (con->sock, "<p><strong>No sourcetable available</strong></p>");
+	}
+	
+	/* Add informational note at the bottom */
+	sock_write_line (con->sock, "<div style=\"margin-top: 30px; padding: 15px; background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; color: #856404;\">");
+	sock_write_line (con->sock, "<p><strong>Note:</strong> This source table has been returned as an HTML page because you requested it using a web browser rather than an NTRIP client. NTRIP clients would receive this data in plain text format.</p>");
+	sock_write_line (con->sock, "</div>");
+	
+	sock_write_line (con->sock, "</body>");
+	sock_write_line (con->sock, "</html>");
+	
+	free (time);
+}
+
 void
 send_sourcetable (connection_t *con) {
 
@@ -372,20 +693,58 @@ send_sourcetable (connection_t *con) {
 			nBufferBytes = 0,
 			fsize = 0;
 	char *time;
+	const char *user_agent;
 
 	time = get_log_time();
+	user_agent = get_user_agent(con);
+	
+	xa_debug(2, "DEBUG: send_sourcetable() User-Agent: [%s]", user_agent ? user_agent : "(null)");
 
+	ifp = fopen("../conf/sourcetable.dat","r");
+	
+	/* Check if this is a browser request */
+	if (is_browser(user_agent)) {
+		xa_debug(2, "DEBUG: Browser detected, sending HTML sourcetable");
+		send_html_sourcetable(con, ifp);
+		if (ifp) fclose(ifp);
+		free (time);
+		return;
+	}
+	
+	/* Original NTRIP client handling */
+	xa_debug(2, "DEBUG: NTRIP client detected, sending plain text sourcetable");
+	
 	sock_write_line (con->sock, "SOURCETABLE 200 OK");
 	sock_write_line (con->sock, "Server: NTRIP NtripCaster %s/%s", info.version, info.ntrip_version);
 //	sock_write_line (con->sock, "Date: %s %s", time, info.timezone);
-	ifp = fopen("../conf/sourcetable.dat","r");
 	if (ifp != NULL) {
-		fseek(ifp, 0, SEEK_END);
-		fsize = (int)ftell(ifp);
+		int filtered_size = 0;
+		char temp_buffer[2000];
+		int temp_nBytes = 1, temp_nBufferBytes = 0;
+		
+		/* First pass: calculate filtered content size */
+		while (temp_nBytes > 0) {
+			temp_nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			while (((unsigned int)c[0] != 10) && (temp_nBytes > 0)) {
+				temp_buffer[temp_nBufferBytes] = c[0];
+				temp_nBufferBytes++;
+				temp_nBytes = fread(c,sizeof(char),sizeof(char),ifp);
+			}
+			temp_buffer[temp_nBufferBytes] = '\0';
+			/* Only count lines that start with "STR" */
+			if (temp_nBufferBytes > 0 && strncmp(temp_buffer, "STR", 3) == 0) {
+				filtered_size += temp_nBufferBytes + 2; /* +2 for \r\n */
+			}
+			temp_nBufferBytes = 0;
+		}
+		filtered_size += 13; /* for "ENDSOURCETABLE" + \r\n */
+		
+		/* Reset file pointer for second pass */
 		rewind(ifp);
-
+		nBytes = 1;
+		
 		sock_write_line (con->sock, "Content-Type: text/plain");
-		sock_write_line (con->sock, "Content-Length: %d\r\n", fsize);
+		sock_write_line (con->sock, "Content-Length: %d\r\n", filtered_size);
 
 		while (nBytes > 0) {
 			nBytes = fread(c,sizeof(char),sizeof(char),ifp);
@@ -395,7 +754,10 @@ send_sourcetable (connection_t *con) {
 				nBytes = fread(c,sizeof(char),sizeof(char),ifp);
 			}
 			szBuffer[nBufferBytes] = '\0';
-			if (nBufferBytes > 0) sock_write_line (con->sock, szBuffer);
+			/* Only send lines that start with "STR" */
+			if (nBufferBytes > 0 && strncmp(szBuffer, "STR", 3) == 0) {
+				sock_write_line (con->sock, szBuffer);
+			}
 			nBufferBytes = 0;
 		}
 

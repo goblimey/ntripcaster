@@ -53,6 +53,7 @@ char *nice_time(unsigned long int seconds, char *buf);
 int ice_strcasecmp (const char *s1, const char *s2);
 int ice_strncmp (const char *s1, const char *s2, size_t n);
 int ice_strcmp (const char *s1, const char *s2);
+const char *ice_strcasestr (const char *haystack, const char *needle);
 size_t ice_strlen (const char *string);
 char *nice_time_minutes (unsigned long int minutes, char *buf);
 const char *nullcheck_string (const char *string);

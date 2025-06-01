@@ -465,6 +465,38 @@ ice_strcasecmp (const char *s1, const char *s2)
 }
 
 const char *
+ice_strcasestr (const char *haystack, const char *needle)
+{
+	const char *h, *n;
+	
+	if (!haystack || !needle)
+	{
+		xa_debug (1, "ERROR: ice_strcasestr() called with NULL pointers");
+		return NULL;
+	}
+	
+	if (*needle == '\0')
+		return haystack;
+	
+	for (; *haystack; haystack++)
+	{
+		h = haystack;
+		n = needle;
+		
+		while (*h && *n && (tolower((unsigned char)*h) == tolower((unsigned char)*n)))
+		{
+			h++;
+			n++;
+		}
+		
+		if (*n == '\0')
+			return haystack;
+	}
+	
+	return NULL;
+}
+
+const char *
 nullcheck_string (const char *string)
 {
 	if (!string)
